@@ -1,0 +1,7 @@
+[run]
+# 覆盖率统计排除项
+# 排除理由：common/messaging（Kafka）为可选集成组件，
+# 当前未被任何服务业务链路引用（settings.KAFKA_ENABLED 未启用），
+# 将其排除让覆盖率更真实地反映"业务代码被测试覆盖的程度"。
+omit =
+    common/messaging/*

@@ -1,0 +1,89 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Database
+*.sqlite3
+*.db
+*.sql
+
+# Environment variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Logs
+*.log
+logs/
+
+# Output directories
+output/
+output_keyframes/
+output_splited_videos/
+backend/output/
+backend/output_keyframes/
+backend/output_splited_videos/
+backend/saved_videos/
+backend/split_logs/
+backend/split_output/
+
+# Videos directory
+videos/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Large model files (SenseVoice模型文件很大，建议单独处理)
+SenseVoiceSmall/model.pt
+SenseVoiceSmall/*.pt
+
+# Temporary files
+*.tmp
+*.temp
+
+# Docker
+.dockerignore
+
+# Backup files
+*.bak
+*.backup
+
+# Sensitive data
+secrets/
+config/secrets.yml
+
+# Test coverage
+.coverage
+htmlcov/
+.pytest_cache/
+
+# Smart split runtime output
+smart_split_output/
+backend/smart_split_output/

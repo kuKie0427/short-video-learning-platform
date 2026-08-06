@@ -1,0 +1,636 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>视频切分页面原型设计</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            align-items: start;
+        }
+
+        /* ===== 左侧：移动端原型 ===== */
+        .prototype-section {
+            perspective: 1000px;
+        }
+
+        .phone-frame {
+            background: white;
+            border-radius: 40px;
+            border: 12px solid #000;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            overflow: hidden;
+            width: 375px;
+            height: 812px;
+            margin: 0 auto;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .phone-status-bar {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 8px 16px;
+            font-size: 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            height: 44px;
+        }
+
+        .status-left {
+            font-weight: 600;
+        }
+
+        .status-right {
+            display: flex;
+            gap: 4px;
+        }
+
+        .phone-content {
+            flex: 1;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            background: #f8f9fa;
+            padding: 0;
+        }
+
+        /* ===== 页面内容 ===== */
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 16px;
+            text-align: center;
+            flex-shrink: 0;
+        }
+
+        .header h1 {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+
+        .header-desc {
+            font-size: 12px;
+            opacity: 0.9;
+        }
+
+        .video-preview {
+            width: 100%;
+            height: 200px;
+            background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+            position: relative;
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .video-preview::before {
+            content: '▶';
+            font-size: 48px;
+            color: white;
+            opacity: 0.6;
+        }
+
+        .video-info {
+            padding: 12px 16px;
+            background: white;
+            border-bottom: 8px solid #f0f0f0;
+            flex-shrink: 0;
+        }
+
+        .video-info-item {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+            font-size: 13px;
+        }
+
+        .video-info-label {
+            color: #666;
+            font-weight: 500;
+        }
+
+        .video-info-value {
+            color: #333;
+            font-weight: 600;
+        }
+
+        .content-section {
+            padding: 16px;
+            flex: 1;
+            overflow-y: auto;
+        }
+
+        .section-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .split-list {
+            list-style: none;
+            margin-bottom: 16px;
+        }
+
+        .split-item {
+            background: white;
+            border-radius: 12px;
+            padding: 12px;
+            margin-bottom: 10px;
+            display: flex;
+            gap: 12px;
+            cursor: pointer;
+            border: 2px solid #f0f0f0;
+            transition: all 0.3s ease;
+        }
+
+        .split-item:hover {
+            border-color: #667eea;
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.15);
+            transform: translateY(-2px);
+        }
+
+        .split-item.active {
+            border-color: #667eea;
+            background: linear-gradient(135deg, rgba(102, 126, 234, 0.05) 0%, rgba(118, 75, 162, 0.05) 100%);
+        }
+
+        .split-item-icon {
+            width: 40px;
+            height: 40px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 20px;
+            flex-shrink: 0;
+        }
+
+        .split-item-content {
+            flex: 1;
+        }
+
+        .split-item-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 4px;
+        }
+
+        .split-item-duration {
+            font-size: 12px;
+            color: #999;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 8px;
+            padding: 16px;
+            background: white;
+            border-top: 1px solid #e0e0e0;
+            flex-shrink: 0;
+        }
+
+        .btn {
+            flex: 1;
+            padding: 12px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+        }
+
+        .btn-secondary {
+            background: #f0f0f0;
+            color: #333;
+        }
+
+        .btn-secondary:active {
+            background: #e0e0e0;
+            transform: scale(0.98);
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+        }
+
+        .btn-primary:active {
+            transform: scale(0.98);
+            box-shadow: 0 2px 8px rgba(102, 126, 234, 0.2);
+        }
+
+        /* ===== 右侧：设计说明 ===== */
+        .design-section {
+            background: white;
+            border-radius: 16px;
+            padding: 24px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            height: fit-content;
+            max-height: 812px;
+            overflow-y: auto;
+        }
+
+        .design-section::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .design-section::-webkit-scrollbar-track {
+            background: #f0f0f0;
+            border-radius: 10px;
+        }
+
+        .design-section::-webkit-scrollbar-thumb {
+            background: #667eea;
+            border-radius: 10px;
+        }
+
+        .design-title {
+            font-size: 20px;
+            font-weight: 700;
+            color: #333;
+            margin-bottom: 16px;
+            padding-bottom: 12px;
+            border-bottom: 2px solid #667eea;
+        }
+
+        .design-block {
+            margin-bottom: 20px;
+        }
+
+        .design-block-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: #667eea;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .design-block-content {
+            font-size: 13px;
+            line-height: 1.6;
+            color: #555;
+            background: #f8f9fa;
+            padding: 12px;
+            border-radius: 8px;
+            border-left: 3px solid #667eea;
+        }
+
+        .feature-list {
+            list-style: none;
+            margin-top: 8px;
+        }
+
+        .feature-list li {
+            padding: 6px 0;
+            padding-left: 20px;
+            position: relative;
+            font-size: 13px;
+            color: #555;
+        }
+
+        .feature-list li::before {
+            content: '✓';
+            position: absolute;
+            left: 0;
+            color: #667eea;
+            font-weight: 600;
+        }
+
+        .color-palette {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
+            margin-top: 8px;
+        }
+
+        .color-item {
+            text-align: center;
+        }
+
+        .color-box {
+            width: 100%;
+            height: 50px;
+            border-radius: 8px;
+            margin-bottom: 6px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .color-label {
+            font-size: 11px;
+            color: #666;
+        }
+
+        .interaction-demo {
+            margin-top: 12px;
+            padding: 12px;
+            background: #f0f0f0;
+            border-radius: 8px;
+            font-size: 12px;
+            color: #666;
+            border-left: 3px solid #667eea;
+        }
+
+        .toast {
+            position: fixed;
+            bottom: 50px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #333;
+            color: white;
+            padding: 12px 16px;
+            border-radius: 8px;
+            font-size: 13px;
+            display: none;
+            z-index: 1000;
+            animation: slideUp 0.3s ease;
+        }
+
+        .toast.show {
+            display: block;
+        }
+
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateX(-50%) translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(-50%) translateY(0);
+            }
+        }
+
+        @media (max-width: 1200px) {
+            .container {
+                grid-template-columns: 1fr;
+            }
+
+            .design-section {
+                max-height: none;
+            }
+        }
+
+        .split-item input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+            accent-color: #667eea;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- 左侧：移动端原型 -->
+        <div class="prototype-section">
+            <div class="phone-frame">
+                <!-- 状态栏 -->
+                <div class="phone-status-bar">
+                    <span class="status-left">9:41</span>
+                    <span class="status-right">📶 🔋</span>
+                </div>
+
+                <!-- 页面内容 -->
+                <div class="phone-content">
+                    <!-- 头部 -->
+                    <div class="header">
+                        <h1>视频切分</h1>
+                        <p class="header-desc">智能分割视频片段</p>
+                    </div>
+
+                    <!-- 视频预览 -->
+                    <div class="video-preview"></div>
+
+                    <!-- 视频信息 -->
+                    <div class="video-info">
+                        <div class="video-info-item">
+                            <span class="video-info-label">视频时长</span>
+                            <span class="video-info-value">5:32</span>
+                        </div>
+                        <div class="video-info-item">
+                            <span class="video-info-label">分辨率</span>
+                            <span class="video-info-value">1920×1080</span>
+                        </div>
+                        <div class="video-info-item">
+                            <span class="video-info-label">文件大小</span>
+                            <span class="video-info-value">256 MB</span>
+                        </div>
+                    </div>
+
+                    <!-- 切分列表 -->
+                    <div class="content-section">
+                        <div class="section-title">
+                            <span>📹</span>
+                            <span>建议切分点</span>
+                        </div>
+
+                        <ul class="split-list">
+                            <li class="split-item active" onclick="selectSplit(this, 1)">
+                                <div class="split-item-icon">1</div>
+                                <div class="split-item-content">
+                                    <div class="split-item-title">开场介绍</div>
+                                    <div class="split-item-duration">0:00 - 1:05</div>
+                                </div>
+                            </li>
+
+                            <li class="split-item" onclick="selectSplit(this, 2)">
+                                <div class="split-item-icon">2</div>
+                                <div class="split-item-content">
+                                    <div class="split-item-title">核心内容讲解</div>
+                                    <div class="split-item-duration">1:05 - 3:45</div>
+                                </div>
+                            </li>
+
+                            <li class="split-item" onclick="selectSplit(this, 3)">
+                                <div class="split-item-icon">3</div>
+                                <div class="split-item-content">
+                                    <div class="split-item-title">实践演示</div>
+                                    <div class="split-item-duration">3:45 - 4:52</div>
+                                </div>
+                            </li>
+
+                            <li class="split-item" onclick="selectSplit(this, 4)">
+                                <div class="split-item-icon">4</div>
+                                <div class="split-item-content">
+                                    <div class="split-item-title">总结互动</div>
+                                    <div class="split-item-duration">4:52 - 5:32</div>
+                                </div>
+                            </li>
+                        </ul>
+                    </div>
+
+                    <!-- 按钮组 -->
+                    <div class="button-group">
+                        <button class="btn btn-secondary" onclick="showToast('已取消')">✕ 取消</button>
+                        <button class="btn btn-primary" onclick="showToast('✓ 切分成功！')">✓ 确认切分</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 右侧：设计说明 -->
+        <div class="design-section">
+            <div class="design-title">📐 设计说明</div>
+
+            <!-- 页面结构 -->
+            <div class="design-block">
+                <div class="design-block-title">页面结构</div>
+                <div class="design-block-content">
+                    采用"金字塔"式设计，从上到下依次为：状态栏、视频预览、视频信息、切分列表、操作按钮。每个区域功能清晰，层级分明。
+                </div>
+            </div>
+
+            <!-- 核心功能 -->
+            <div class="design-block">
+                <div class="design-block-title">核心功能</div>
+                <ul class="feature-list">
+                    <li>智能推荐切分点</li>
+                    <li>实时预览和选择</li>
+                    <li>时间点精确显示</li>
+                    <li>一键切分处理</li>
+                    <li>撤销操作</li>
+                </ul>
+            </div>
+
+            <!-- 交互设计 -->
+            <div class="design-block">
+                <div class="design-block-title">交互设计</div>
+                <div class="design-block-content">
+                    <strong>点击选择：</strong>用户点击任意切分项即可选中，选中项显示蓝色高亮和阴影效果，提供视觉反馈。
+                </div>
+                <div class="interaction-demo">
+                    💡 Try: 点击上面的切分项试试交互效果
+                </div>
+            </div>
+
+            <!-- 视觉设计 -->
+            <div class="design-block">
+                <div class="design-block-title">色彩系统</div>
+                <div class="color-palette">
+                    <div class="color-item">
+                        <div class="color-box" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);"></div>
+                        <div class="color-label">主色</div>
+                    </div>
+                    <div class="color-item">
+                        <div class="color-box" style="background: #f0f0f0;"></div>
+                        <div class="color-label">背景</div>
+                    </div>
+                    <div class="color-item">
+                        <div class="color-box" style="background: white; border: 1px solid #e0e0e0;"></div>
+                        <div class="color-label">卡片</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 排版规范 -->
+            <div class="design-block">
+                <div class="design-block-title">排版规范</div>
+                <div class="design-block-content">
+                    <strong>字体：</strong>系统默认字体<br>
+                    <strong>标题：</strong>18px 600weight<br>
+                    <strong>正文：</strong>14px 400weight<br>
+                    <strong>辅助：</strong>12px 400weight
+                </div>
+            </div>
+
+            <!-- 交互反馈 -->
+            <div class="design-block">
+                <div class="design-block-title">反馈机制</div>
+                <ul class="feature-list">
+                    <li>选中态：蓝色边框 + 淡色背景</li>
+                    <li>Hover 态：向上移动 + 阴影增强</li>
+                    <li>按压态：缩放 0.98 + 阴影减弱</li>
+                    <li>Toast 提示：底部滑入动画</li>
+                </ul>
+            </div>
+
+            <!-- 设计亮点 -->
+            <div class="design-block">
+                <div class="design-block-title">设计亮点</div>
+                <ul class="feature-list">
+                    <li>渐变色主题，视觉层次分明</li>
+                    <li>圆角+阴影，iOS风格设计</li>
+                    <li>顺滑的过渡动画</li>
+                    <li>高对比度文案易读性强</li>
+                    <li>充分的留白，呼吸感十足</li>
+                </ul>
+            </div>
+
+            <!-- 适配方案 -->
+            <div class="design-block">
+                <div class="design-block-title">响应式适配</div>
+                <div class="design-block-content">
+                    设计适配所有常见移动设备（宽度375-428px），使用flexbox和grid实现弹性布局。
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast 提示 -->
+    <div class="toast" id="toast"></div>
+
+    <script>
+        function selectSplit(element, splitId) {
+            // 移除其他项的激活状态
+            document.querySelectorAll('.split-item').forEach(item => {
+                item.classList.remove('active');
+            });
+            // 给当前项添加激活状态
+            element.classList.add('active');
+        }
+
+        function showToast(message) {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.classList.add('show');
+
+            // 3秒后隐藏
+            setTimeout(() => {
+                toast.classList.remove('show');
+            }, 3000);
+        }
+
+        // 演示提示
+        document.addEventListener('DOMContentLoaded', function() {
+            setTimeout(() => {
+                showToast('💡 试试点击切分项和按钮！');
+            }, 500);
+        });
+    </script>
+</body>
+</html>

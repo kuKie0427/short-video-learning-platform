@@ -1,0 +1,256 @@
+services:
+  # PostgreSQL数据库
+  postgres:
+    image: postgres:14
+    container_name: short_video_postgres
+    environment:
+      POSTGRES_DB: short_video_platform
+      POSTGRES_USER: app_user
+      POSTGRES_PASSWORD: app_password_2025
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U app_user"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis缓存
+  redis:
+    image: redis:7-alpine
+    container_name: short_video_redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Kafka消息队列
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    container_name: short_video_zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - "2181:2181"
+
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: short_video_kafka
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    healthcheck:
+      test: ["CMD", "kafka-broker-api-versions", "--bootstrap-server", "localhost:9092"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Auth服务
+  auth-service:
+    build:
+      context: .
+      dockerfile: ./services/auth/Dockerfile
+    container_name: auth_service
+    ports:
+      - "8001:8001"
+    environment:
+      DATABASE_URL: postgresql://app_user:app_password_2025@postgres:5432/short_video_platform
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-your-secret-key-change-in-production}
+      ENVIRONMENT: ${ENVIRONMENT:-development}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # Content服务
+  content-service:
+    build:
+      context: .
+      dockerfile: ./services/content/Dockerfile
+    container_name: content_service
+    ports:
+      - "8002:8002"
+    environment:
+      DATABASE_URL: postgresql://app_user:app_password_2025@postgres:5432/short_video_platform
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      ENVIRONMENT: ${ENVIRONMENT:-development}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+
+  # Upload服务
+  upload-service:
+    build:
+      context: .
+      dockerfile: ./services/upload/Dockerfile
+    container_name: upload_service
+    ports:
+      - "8003:8003"
+    environment:
+      DATABASE_URL: postgresql://app_user:app_password_2025@postgres:5432/short_video_platform
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      ENVIRONMENT: ${ENVIRONMENT:-development}
+      UPLOAD_BASE_DIR: /app/data/uploads
+    volumes:
+      - ./data:/app/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+
+  # Split服务
+  split-service:
+    build:
+      context: .
+      dockerfile: ./services/split/Dockerfile
+    container_name: split_service
+    ports:
+      - "8004:8004"
+    environment:
+      DATABASE_URL: postgresql://app_user:app_password_2025@postgres:5432/short_video_platform
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      ENVIRONMENT: ${ENVIRONMENT:-development}
+      VIDEO_SPLIT_SERVICE_TYPE: "smart"
+      GLM_API_KEY: ${GLM_API_KEY:-}
+      VIDEO_SPLIT_OUTPUT_DIR: /app/smart_split_output
+    volumes:
+      - split-output:/app/services/split/smart_split_output
+      - ./data:/app/data
+      - ../SenseVoiceSmall:/app/SenseVoiceSmall:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+
+  # Split worker (Celery)
+  split-worker:
+    build:
+      context: .
+      dockerfile: ./services/split/Dockerfile
+    container_name: split_worker
+    command: >
+      celery -A services.split.app.celery_app.celery_app worker --loglevel=info --concurrency=1
+    environment:
+      DATABASE_URL: postgresql://app_user:app_password_2025@postgres:5432/short_video_platform
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_URL: redis://redis:6379/0
+      ENVIRONMENT: ${ENVIRONMENT:-development}
+      VIDEO_SPLIT_SERVICE_TYPE: "smart"
+      GLM_API_KEY: ${GLM_API_KEY:-}
+      VIDEO_SPLIT_OUTPUT_DIR: /app/smart_split_output
+    volumes:
+      - split-output:/app/services/split/smart_split_output
+      - ./data:/app/data
+      - ../SenseVoiceSmall:/app/SenseVoiceSmall:ro
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+
+  # Course服务
+  course-service:
+    build:
+      context: .
+      dockerfile: ./services/course/Dockerfile
+    container_name: course_service
+    ports:
+      - "8005:8005"
+    environment:
+      DATABASE_URL: postgresql://app_user:app_password_2025@postgres:5432/short_video_platform
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      ENVIRONMENT: ${ENVIRONMENT:-development}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+
+  # Search服务
+  search-service:
+    build:
+      context: .
+      dockerfile: ./services/search/Dockerfile
+    container_name: search_service
+    ports:
+      - "8006:8006"
+    environment:
+      DATABASE_URL: postgresql://app_user:app_password_2025@postgres:5432/short_video_platform
+      ENVIRONMENT: ${ENVIRONMENT:-development}
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # Notification服务
+  notification-service:
+    build:
+      context: .
+      dockerfile: ./services/notification/Dockerfile
+    container_name: notification_service
+    ports:
+      - "8007:8007"
+    environment:
+      DATABASE_URL: postgresql://app_user:app_password_2025@postgres:5432/short_video_platform
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      ENVIRONMENT: ${ENVIRONMENT:-development}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+
+  # API网关 (Nginx)
+  gateway:
+    image: nginx:alpine
+    container_name: api_gateway
+    ports:
+      - "80:80"
+    volumes:
+      - ./gateway/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./data:/app/data:rw  # 上传的视频文件，需要可写权限
+      - split-output:/app/services/split/smart_split_output:ro  # 切分输出文件
+    depends_on:
+      - auth-service
+      - content-service
+      - upload-service
+      - split-service
+      - course-service
+      - search-service
+      - notification-service
+
+volumes:
+  postgres_data:
+  split-output:  # 新增命名卷用于共享切分输出
+

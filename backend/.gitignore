@@ -1,0 +1,83 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual Environment
+venv/
+ENV/
+env/
+.venv
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Environment variables
+.env
+.env.local
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Logs
+*.log
+logs/
+*_logs*.txt
+worker_logs*.txt
+
+# Data directory (uploaded files, processed media)
+data/
+!data/.gitkeep
+
+# Legacy upload directory
+services/upload/uploads/
+
+# Temporary test files
+tmp_*.py
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Test coverage
+.coverage
+htmlcov/
+.pytest_cache/
+.tox/
+
+# Videos and media
+videos/
+output/
+output_keyframes/
+output_splited_videos/
+saved_videos/
+
+# Docker
+.dockerignore
+
+# Alembic
+alembic/versions/*.pyc
+

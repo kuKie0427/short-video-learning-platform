@@ -1,0 +1,25 @@
+# 核心依赖
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+sqlalchemy>=2.0.35  # Python 3.13 需要 2.0.35+ 版本
+# 使用 psycopg 3.x 替代 psycopg2-binary，完全支持 Python 3.13
+# psycopg 3.x 与 psycopg2 兼容，可以直接替换
+psycopg[binary]>=3.1.0
+pydantic>=2.6.0  # Python 3.13 需要 2.6+
+pydantic-settings>=2.1.0
+python-jose[cryptography]==3.3.0
+redis==5.0.1
+python-multipart==0.0.6
+kafka-python==2.0.2
+celery==5.2.7  # split 服务异步任务（services/split/requirements.txt 同步声明）
+
+# 测试依赖
+pytest==7.4.3
+pytest-asyncio==0.21.1
+pytest-cov==4.1.0
+httpx>=0.25.0,<0.26.0  # 与 FastAPI 0.104.1 和 starlette 0.27.0 兼容
+faker==20.1.0
+freezegun==1.2.2
+
+# 数据库迁移
+alembic==1.12.1
