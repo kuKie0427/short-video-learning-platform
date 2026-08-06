@@ -342,7 +342,7 @@ def test_user(db: Session) -> User:
     """创建测试用户"""
     user = User(
         id=str(fake.uuid4()),
-        phone=fake.phone_number()[:20],
+        phone=fake.unique.phone_number()[:20],
         nickname=fake.name(),
         avatar_url=fake.image_url(),
         bio=fake.text()[:200],
@@ -360,7 +360,7 @@ def test_user2(db: Session) -> User:
     """创建第二个测试用户"""
     user = User(
         id=str(fake.uuid4()),
-        phone=fake.phone_number()[:20],
+        phone=fake.unique.phone_number()[:20],
         nickname=fake.name(),
         avatar_url=fake.image_url(),
         bio=fake.text()[:200],
@@ -378,7 +378,7 @@ def admin_user(db: Session) -> User:
     """创建管理员用户"""
     user = User(
         id=str(fake.uuid4()),
-        phone=fake.phone_number()[:20],
+        phone=fake.unique.phone_number()[:20],
         nickname="管理员",
         avatar_url=fake.image_url(),
         language="zh-CN",
