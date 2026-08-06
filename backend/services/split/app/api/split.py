@@ -1088,6 +1088,26 @@ async def simple_split(
 ):
     """简化视频分割接口（用于前端演示）"""
     
+    # 验证视频存在（避免外键约束错误返回 500）
+    video = db.query(Video).filter(Video.id == video_id).first()
+    if not video:
+        return not_found_response("视频不存在")
+    
+    # 确保演示用户存在（simple-split 无认证，固定使用演示用户）
+    demo_user_id = "00000000-0000-0000-0000-000000000001"
+    demo_user = db.query(User).filter(User.id == demo_user_id).first()
+    if not demo_user:
+        demo_user = User(
+            id=demo_user_id,
+            phone="13800138000",
+            nickname="演示用户",
+            avatar_url="",
+            bio="用于前端演示的用户",
+            roles=["admin"]
+        )
+        db.add(demo_user)
+        db.commit()
+    
     # 创建分割任务
     task_id = f"split_{uuid.uuid4().hex[:8]}"
     
