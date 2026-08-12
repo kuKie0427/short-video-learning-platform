@@ -5,9 +5,10 @@ from typing import List, Dict, Any
 
 # AI 重型组件为可选依赖：未安装 torch/opencv 时仍可构造管线（仅降级模式可用）
 try:
-    from .keyframe_extractor import KeyframeExtractor
-    from .speech_to_text import SpeechToText
-    _AI_DEPS_AVAILABLE = True
+    from .keyframe_extractor import KeyframeExtractor, cv2 as _keyframe_cv2
+    from .speech_to_text import SpeechToText, torch as _stt_torch
+    # 组件可 import 不代表依赖可用（cv2/torch 可能为 None），据此计算真实可用性
+    _AI_DEPS_AVAILABLE = _keyframe_cv2 is not None and _stt_torch is not None
 except ImportError:
     KeyframeExtractor = None
     SpeechToText = None

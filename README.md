@@ -8,8 +8,8 @@
 
 采用微服务架构，提供完整的视频处理、内容推荐、课程管理等功能
 
-[![Tests](https://img.shields.io/badge/tests-234%2F234%20passing-brightgreen)]()
-[![Coverage](https://img.shields.io/badge/coverage-68%25-yellow)]()
+[![Tests](https://img.shields.io/badge/tests-266%2F266%20passing-brightgreen)]()
+[![Coverage](https://img.shields.io/badge/coverage-75%25-yellow)]()
 [![Python](https://img.shields.io/badge/python-3.11%2B-blue)]()
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115%2B-009688)]()
 [![React](https://img.shields.io/badge/React-18.3%2B-61dafb)]()
@@ -156,7 +156,7 @@ my-project/
 │   │   ├── uploads/                # 用户上传文件
 │   │   └── temp/                   # 临时处理文件
 │   ├── docs/                       # 完整的文档中心
-│   ├── tests/                      # 测试套件（234 用例）
+│   ├── tests/                      # 测试套件（266 用例）
 │   ├── scripts/                    # 工具脚本
 │   ├── alembic/                    # 数据库迁移
 │   └── docker-compose.yml          # Docker 编排文件
@@ -370,8 +370,8 @@ my-project/
 |------|------|------|
 | ✅ **微服务数量** | 7个服务 + 1个网关 | 高内聚低耦合的架构设计 |
 | ✅ **API接口** | 56 个 | 完整的RESTful API |
-| ✅ **测试通过率** | 234/234 (100%) | 高质量代码保障（实测） |
-| ✅ **代码覆盖率** | 68% | 核心模块 74%-98%（实测） |
+| ✅ **测试通过率** | 266/266 (100%) | 高质量代码保障（实测） |
+| ✅ **代码覆盖率** | 75% | 核心模块 74%-98%（实测） |
 | ✅ **响应时间** | P95 36ms | 性能基线实测（20 并发） |
 | ✅ **并发处理** | RPS 15.5 | Locust 基线实测（20 并发） |
 
@@ -618,11 +618,11 @@ DATABASE_URL = "sqlite:///./test.db"
 
 ```
 📊 测试概览:
-├── 总测试用例: 234（API 129 + 单元 105）
-├── 通过率: 234/234 (100%)
-├── 代码覆盖率: 68%（实测）
+├── 总测试用例: 266（API 129 + 单元 137）
+├── 通过率: 266/266 (100%)
+├── 代码覆盖率: 75%（实测）
 ├── API测试: 129
-├── 单元测试: 105
+├── 单元测试: 137
 └── 集成测试: 待添加
 
 📁 测试分类:
@@ -778,7 +778,7 @@ pytest tests/ -v
 - [x] 消息通知系统
 - [x] 微服务架构实现
 - [x] Docker容器化部署
-- [x] 单元测试和API测试（234 用例）
+- [x] 单元测试和API测试（266 用例）
 - [x] 完整文档体系
 
 ### 进行中 🚧

@@ -41,7 +41,7 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      - name: Run full test suite (234 cases, PostgreSQL integration)
+      - name: Run full test suite (266 cases, PostgreSQL integration)
         run: pytest tests/ -q
 
       - name: Upload coverage report
