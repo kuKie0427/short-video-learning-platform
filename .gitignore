@@ -87,3 +87,7 @@ htmlcov/
 # Smart split runtime output
 smart_split_output/
 backend/smart_split_output/
+# E2E 测试产物
+e2e/node_modules/
+e2e/test-results/
+e2e/playwright-report/
