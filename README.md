@@ -8,8 +8,8 @@
 
 采用微服务架构，提供完整的视频处理、内容推荐、课程管理等功能
 
-[![Tests](https://img.shields.io/badge/tests-146%2F147%20passing-brightgreen)]()
-[![Coverage](https://img.shields.io/badge/coverage-71%25-yellow)]()
+[![Tests](https://img.shields.io/badge/tests-234%2F234%20passing-brightgreen)]()
+[![Coverage](https://img.shields.io/badge/coverage-68%25-yellow)]()
 [![Python](https://img.shields.io/badge/python-3.11%2B-blue)]()
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115%2B-009688)]()
 [![React](https://img.shields.io/badge/React-18.3%2B-61dafb)]()
@@ -156,7 +156,7 @@ my-project/
 │   │   ├── uploads/                # 用户上传文件
 │   │   └── temp/                   # 临时处理文件
 │   ├── docs/                       # 完整的文档中心
-│   ├── tests/                      # 测试套件（200+用例）
+│   ├── tests/                      # 测试套件（234 用例）
 │   ├── scripts/                    # 工具脚本
 │   ├── alembic/                    # 数据库迁移
 │   └── docker-compose.yml          # Docker 编排文件
@@ -369,11 +369,11 @@ my-project/
 | 指标 | 数值 | 说明 |
 |------|------|------|
 | ✅ **微服务数量** | 7个服务 + 1个网关 | 高内聚低耦合的架构设计 |
-| ✅ **API接口** | 60+ 个 | 完整的RESTful API |
-| ✅ **测试通过率** | 99.3% (146/147) | 高质量代码保障 |
-| ✅ **代码覆盖率** | 71% | 核心逻辑全覆盖 |
-| ✅ **响应时间** | <200ms | API平均响应时间 |
-| ✅ **并发处理** | 1000+ req/s | 压力测试结果 |
+| ✅ **API接口** | 56 个 | 完整的RESTful API |
+| ✅ **测试通过率** | 234/234 (100%) | 高质量代码保障（实测） |
+| ✅ **代码覆盖率** | 68% | 核心模块 74%-98%（实测） |
+| ✅ **响应时间** | P95 36ms | 性能基线实测（20 并发） |
+| ✅ **并发处理** | RPS 15.5 | Locust 基线实测（20 并发） |
 
 ### AI性能指标
 | 模型/算法 | 指标 | 数值 |
@@ -401,7 +401,7 @@ my-project/
 ### 📐 设计文档
 - [**系统架构设计**](./backend/docs/系统架构设计文档.md) - 微服务架构设计和技术选型
 - [**数据库设计**](./backend/docs/数据库设计文档.md) - 13张表的完整结构和关系
-- [**API设计文档**](./backend/docs/API设计文档.md) - 60+接口的详细文档和示例
+- [**API设计文档**](./backend/docs/API设计文档.md) - 56 个接口的详细文档和示例
 
 ### 🔧 开发文档
 - [**运行测试**](./backend/docs/运行测试.md) - 测试环境配置和运行指南
@@ -618,11 +618,11 @@ DATABASE_URL = "sqlite:///./test.db"
 
 ```
 📊 测试概览:
-├── 总测试用例: 200+
-├── 通过率: 99.3% (146/147)
-├── 代码覆盖率: 71%
-├── API测试: 80+
-├── 单元测试: 120+
+├── 总测试用例: 234（API 129 + 单元 105）
+├── 通过率: 234/234 (100%)
+├── 代码覆盖率: 68%（实测）
+├── API测试: 129
+├── 单元测试: 105
 └── 集成测试: 待添加
 
 📁 测试分类:
@@ -778,7 +778,7 @@ pytest tests/ -v
 - [x] 消息通知系统
 - [x] 微服务架构实现
 - [x] Docker容器化部署
-- [x] 单元测试和API测试（200+用例）
+- [x] 单元测试和API测试（234 用例）
 - [x] 完整文档体系
 
 ### 进行中 🚧

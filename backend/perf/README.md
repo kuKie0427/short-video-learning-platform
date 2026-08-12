@@ -8,7 +8,7 @@
 | ------ | ------ | ------ |
 | `GET /api/feed/recommend` | 智能推荐流（4 算法混合，Redis 缓存） | content :8002 |
 | `GET /api/feed/hot` | 热门视频（时间衰减） | content :8002 |
-| `GET /api/search/videos` | 视频搜索（GIN 索引） | search :8006 |
+| `GET /api/search/videos` | 视频搜索（ilike，tags ARRAY 列 GIN 索引） | search :8006 |
 | `GET /api/auth/profile` | 用户资料（完整认证链路） | auth :8001 |
 
 ## 环境准备
