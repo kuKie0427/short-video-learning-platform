@@ -42,6 +42,11 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
+      # video_split 用例(9 条)构造 RealVideoSplitService 时校验 ffmpeg,
+      # ubuntu runner 镜像不再预装,需显式安装
+      - name: Install ffmpeg
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg
+
       - name: Run full test suite (304 cases, PostgreSQL integration)
         run: pytest tests/ -q
 
@@ -130,6 +135,10 @@ jobs:
       - name: Install backend dependencies
         run: pip install -r requirements.txt
         working-directory: backend
+
+      # direct-split 链路(split.spec.ts)依赖 ffmpeg 切分视频
+      - name: Install ffmpeg
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg
 
       - uses: actions/setup-node@v4
         with:
