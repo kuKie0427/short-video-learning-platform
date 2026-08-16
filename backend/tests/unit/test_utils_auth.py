@@ -1,69 +1,139 @@
 """
 认证工具函数单元测试
-"""
-import pytest
-from datetime import datetime, timedelta, timezone
-from jose import jwt, JWTError
-from fastapi import HTTPException
 
-from common.utils.auth import verify_token, get_current_user
+直接调用 common/utils/auth.py 中的 verify_token / get_current_user / get_optional_user，
+覆盖真实代码路径：JWT 验签、过期处理、sub 缺失、开发环境 UUID 直通与自动建用户。
+（旧版本只断言了 jose 库自身行为，未触达项目代码，已整体重写。）
+"""
+import uuid
+from datetime import datetime, timedelta, timezone
+
+import pytest
+from fastapi import HTTPException
+from fastapi.security import HTTPAuthorizationCredentials
+from jose import jwt
+
+from common.utils.auth import verify_token, get_current_user, get_optional_user
 from common.config.settings import settings
 from common.models import User
 
+WRONG_SECRET = "wrong-secret-key-for-forgery-test"
 
+
+def _make_token(user_id: str = None, secret: str = None,
+                expires_delta: timedelta = None, include_sub: bool = True) -> str:
+    """构造 JWT（测试数据准备；被测对象是 verify_token 的验证逻辑）"""
+    if expires_delta is None:
+        expires_delta = timedelta(minutes=settings.JWT_ACCESS_TOKEN_EXPIRE_MINUTES)
+    payload = {"exp": datetime.now(timezone.utc) + expires_delta}
+    if include_sub:
+        payload["sub"] = user_id
+    return jwt.encode(
+        payload,
+        secret or settings.JWT_SECRET_KEY,
+        algorithm=settings.JWT_ALGORITHM
+    )
+
+
+def _creds(token: str) -> HTTPAuthorizationCredentials:
+    return HTTPAuthorizationCredentials(scheme="Bearer", credentials=token)
+
+
+@pytest.mark.unit
 class TestVerifyToken:
-    """测试JWT token验证"""
-    
-    def test_verify_valid_token(self, test_user):
-        """测试验证有效token"""
-        token = self._create_token(str(test_user.id))
-        # 注意：verify_token需要HTTPAuthorizationCredentials，这里简化测试
-        # 实际测试应该在API层面进行
-        assert token is not None
-    
-    def test_verify_expired_token(self, test_user):
-        """测试验证过期token"""
-        token = self._create_token(str(test_user.id), expires_delta=timedelta(minutes=-1))
-        # 过期token应该抛出异常
-        with pytest.raises(JWTError):
-            jwt.decode(token, settings.JWT_SECRET_KEY, algorithms=[settings.JWT_ALGORITHM])
-    
-    def test_verify_invalid_token(self):
-        """测试验证无效token"""
-        invalid_token = "invalid.token.here"
-        with pytest.raises(JWTError):
-            jwt.decode(invalid_token, settings.JWT_SECRET_KEY, algorithms=[settings.JWT_ALGORITHM])
-    
-    def test_verify_token_without_sub(self):
-        """测试token中没有sub字段"""
-        payload = {"exp": datetime.now(timezone.utc) + timedelta(minutes=30)}
-        token = jwt.encode(payload, settings.JWT_SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
-        decoded = jwt.decode(token, settings.JWT_SECRET_KEY, algorithms=[settings.JWT_ALGORITHM])
-        assert decoded.get("sub") is None
-    
-    def _create_token(self, user_id: str, expires_delta: timedelta = None) -> str:
-        """创建测试token"""
-        if expires_delta is None:
-            expires_delta = timedelta(minutes=settings.JWT_ACCESS_TOKEN_EXPIRE_MINUTES)
-        
-        expire = datetime.now(timezone.utc) + expires_delta
-        to_encode = {"sub": user_id, "exp": expire}
-        return jwt.encode(to_encode, settings.JWT_SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
+    """verify_token：JWT 验签与开发环境直通"""
+
+    def test_valid_jwt_returns_user_id(self, test_user):
+        """有效 JWT 返回 sub 中的用户ID"""
+        token = _make_token(str(test_user.id))
+        assert verify_token(_creds(token)) == str(test_user.id)
+
+    def test_expired_jwt_raises_401(self, test_user):
+        """过期 token → 401（JWTError 被捕获并转为 HTTPException）"""
+        token = _make_token(str(test_user.id), expires_delta=timedelta(minutes=-1))
+        with pytest.raises(HTTPException) as exc_info:
+            verify_token(_creds(token))
+        assert exc_info.value.status_code == 401
+
+    def test_forged_signature_raises_401(self, test_user):
+        """错误密钥签发的伪造 token → 401（验签失败）"""
+        token = _make_token(str(test_user.id), secret=WRONG_SECRET)
+        with pytest.raises(HTTPException) as exc_info:
+            verify_token(_creds(token))
+        assert exc_info.value.status_code == 401
+
+    def test_malformed_token_raises_401(self):
+        """格式非法的 token → 401"""
+        with pytest.raises(HTTPException) as exc_info:
+            verify_token(_creds("not-a-jwt-token"))
+        assert exc_info.value.status_code == 401
+
+    def test_jwt_without_sub_raises_401(self):
+        """缺少 sub 字段的合法 JWT → 401（验签通过但无用户标识）"""
+        token = _make_token(include_sub=False)
+        with pytest.raises(HTTPException) as exc_info:
+            verify_token(_creds(token))
+        assert exc_info.value.status_code == 401
+
+    def test_dev_mode_uuid_passthrough(self):
+        """开发环境后门：UUID 格式字符串直接作为 user_id 放行（压测/联调用）"""
+        if not settings.is_development:
+            pytest.skip("仅开发环境启用 UUID 直通")
+        dev_uuid = str(uuid.uuid4())
+        assert verify_token(_creds(dev_uuid)) == dev_uuid
 
 
+@pytest.mark.unit
 class TestGetCurrentUser:
-    """测试获取当前用户"""
-    
-    def test_get_current_user_exists(self, db, test_user):
-        """测试获取存在的用户"""
-        user = db.query(User).filter(User.id == test_user.id).first()
-        assert user is not None
+    """get_current_user：token → 数据库用户的完整解析"""
+
+    def test_valid_token_returns_persisted_user(self, db, test_user):
+        """有效 token 返回数据库中对应的真实用户对象"""
+        token = _make_token(str(test_user.id))
+        user = get_current_user(credentials=_creds(token), db=db)
+        assert isinstance(user, User)
         assert user.id == test_user.id
         assert user.phone == test_user.phone
-    
-    def test_get_current_user_not_exists(self, db):
-        """测试获取不存在的用户"""
-        fake_user_id = "00000000-0000-0000-0000-000000000000"
-        user = db.query(User).filter(User.id == fake_user_id).first()
-        assert user is None
 
+    def test_expired_token_raises_401(self, db, test_user):
+        """过期 token 的 401 从 verify_token 透传"""
+        token = _make_token(str(test_user.id), expires_delta=timedelta(minutes=-1))
+        with pytest.raises(HTTPException) as exc_info:
+            get_current_user(credentials=_creds(token), db=db)
+        assert exc_info.value.status_code == 401
+
+    def test_dev_mode_auto_creates_user(self, db):
+        """开发环境：token 用户不存在时自动创建（phone 带 dev_ 前缀），并真实落库"""
+        if not settings.is_development:
+            pytest.skip("仅开发环境启用自动建用户")
+        new_user_id = str(uuid.uuid4())
+        token = _make_token(new_user_id)
+
+        user = get_current_user(credentials=_creds(token), db=db)
+
+        assert str(user.id) == new_user_id
+        assert user.phone == f"dev_{new_user_id[:8]}"
+        # 验证副作用：用户确实写入了数据库
+        persisted = db.query(User).filter(User.id == new_user_id).first()
+        assert persisted is not None
+
+
+@pytest.mark.unit
+class TestGetOptionalUser:
+    """get_optional_user：可选认证（匿名访问场景）"""
+
+    def test_no_credentials_returns_none(self, db):
+        """无认证头 → None（匿名用户，不抛异常）"""
+        assert get_optional_user(credentials=None, db=db) is None
+
+    def test_invalid_token_returns_none_not_raise(self, db):
+        """非法 token → None 而非异常（与 verify_token 的 401 行为形成对比）"""
+        creds = _creds("malformed-token")
+        assert get_optional_user(credentials=creds, db=db) is None
+
+    def test_valid_token_returns_user(self, db, test_user):
+        """有效 token → 对应用户"""
+        creds = _creds(_make_token(str(test_user.id)))
+        user = get_optional_user(credentials=creds, db=db)
+        assert user is not None
+        assert user.id == test_user.id
