@@ -14,6 +14,10 @@ export default defineConfig({
   testDir: './tests',
   timeout: 60_000,
   fullyParallel: false,
+  // 串行执行：vite dev server 冷启动编译 1500+ 模块时，
+  // 多 worker 并行首次访问会互相竞争编译导致超时（见 e2e/README.md）。
+  // 冒烟套件仅 5 条用例，串行 <15s，换取确定性。
+  workers: 1,
   retries: 0,
   reporter: [['list']],
   use: {

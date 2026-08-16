@@ -335,7 +335,15 @@ async def direct_split_video(
         
         video_path = video.play_url
         if video_path.startswith('/uploads/'):
-            video_path = '/app/data' + video_path
+            # 兼容三种部署形态（原实现硬编码 Docker 路径，本地/CI 部署必失败）：
+            # 1. 本地/CI：UPLOAD_BASE_DIR 指向 upload 服务实际落盘目录（文件在 {base}/文件名）
+            # 2. Docker compose：未设 UPLOAD_BASE_DIR，回退 /app/data/uploads
+            # 3. 测试模式 play_url（/test/videos/...）：按绝对路径处理
+            upload_dir = os.getenv('UPLOAD_BASE_DIR')
+            if upload_dir:
+                video_path = os.path.join(upload_dir, video_path[len('/uploads/'):])
+            else:
+                video_path = '/app/data' + video_path
         elif not os.path.isabs(video_path):
             video_path = os.path.join('/app/data', video_path.lstrip('/'))
         
@@ -556,9 +564,12 @@ async def get_split_tasks(
     
     tasks_data = []
     for task in tasks:
+        # video_id 用于前端切分列表页按视频关联任务状态
+        video_id = task.long_video.video_id if task.long_video else None
         tasks_data.append({
             "id": str(task.id),
             "task_id": task.task_id,
+            "video_id": str(video_id) if video_id else None,
             "long_video_id": str(task.long_video_id),
             "user_id": str(task.user_id),
             "split_mode": task.split_mode,

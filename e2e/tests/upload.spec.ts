@@ -4,8 +4,10 @@ import path from 'path';
 /**
  * 上传冒烟（真实后端链路）
  *
- * 上传走真实 API: init → chunk(PUT, 二进制分片, 5MB/片) → complete。
- * 测试素材: 项目 short_video/3分钟学习微积分.mp4（7.7MB，2 个分片）。
+ * 上传走真实 API: init → chunk(PUT, 二进制分片) → complete。
+ * 服务端分片上限 5MB（init 返回 chunk_size: 5242880），前端按 2MB/片切片
+ * （useResumableUpload.ts:4 CHUNK_SIZE = 2MB）。
+ * 测试素材: 项目 short_video/3分钟学习微积分.mp4（7.7MB，前端切 4 片）。
  * 需要 upload 服务 + 网关就绪；开发环境自动注入 UUID token。
  */
 test('上传: 选择视频文件 → 上传流程启动 → 完成跳转', async ({ page }) => {

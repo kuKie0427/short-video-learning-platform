@@ -88,6 +88,77 @@ class TestGetSplitTasks:
         
         assert response.status_code == 403
 
+    def test_get_split_tasks_includes_video_id(self, split_client, auth_headers, db, test_user, test_video):
+        """【回归】任务列表返回 video_id：前端切分列表页按视频关联任务状态
+
+        原缺陷：/api/split/tasks 返回的任务缺少 video_id 字段，
+        前端无法把历史任务状态关联到视频列表（任务状态跨会话不可见）。
+        修复：任务序列化时经 task.long_video 关联取 video_id。
+        """
+        from common.models import LongVideo, SplitTask
+        long_video = LongVideo(
+            id=str(uuid.uuid4()),
+            video_id=test_video.id,
+            original_duration=3600,
+            original_file_url="/path/to/video.mp4",
+            split_enabled=True
+        )
+        db.add(long_video)
+        db.commit()
+
+        task = SplitTask(
+            id=str(uuid.uuid4()),
+            task_id=f"split_{uuid.uuid4().hex[:8]}",
+            long_video_id=long_video.id,
+            user_id=test_user.id,
+            split_mode="auto",
+            organization_mode="course",
+            status="pending",
+            progress=0.0
+        )
+        db.add(task)
+        db.commit()
+
+        response = split_client.get("/api/split/tasks", headers=auth_headers)
+        assert response.status_code == 200
+        tasks = response.json()["data"]
+        assert any(
+            t["task_id"] == task.task_id and t["video_id"] == str(test_video.id)
+            for t in tasks
+        ), "任务列表应包含 video_id 且与关联视频一致"
+
+    def test_get_split_tasks_user_isolation(self, split_client, auth_headers, auth_headers_user2, db, test_user, test_user2, test_video):
+        """权限隔离：其他用户的任务不出现在我的列表"""
+        from common.models import LongVideo, SplitTask
+        long_video = LongVideo(
+            id=str(uuid.uuid4()),
+            video_id=test_video.id,
+            original_duration=3600,
+            original_file_url="/path/to/video.mp4",
+            split_enabled=True
+        )
+        db.add(long_video)
+        db.commit()
+
+        other_task = SplitTask(
+            id=str(uuid.uuid4()),
+            task_id=f"split_{uuid.uuid4().hex[:8]}",
+            long_video_id=long_video.id,
+            user_id=test_user2.id,  # 其他用户的任务
+            split_mode="auto",
+            organization_mode="course",
+            status="completed",
+            progress=100.0
+        )
+        db.add(other_task)
+        db.commit()
+
+        response = split_client.get("/api/split/tasks", headers=auth_headers)
+        tasks = response.json()["data"]
+        assert all(
+            t["task_id"] != other_task.task_id for t in tasks
+        ), "列表不应包含其他用户的任务"
+
 
 @pytest.mark.api
 class TestGetSplitTask:
