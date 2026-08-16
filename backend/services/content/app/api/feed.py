@@ -753,18 +753,20 @@ async def search_videos(
     )
     
     # 根据搜索类型添加搜索条件
+    # 转义 LIKE 通配符（% _ \），使其按字面量匹配：q=% 不再匹配全部视频（原缺陷见 tests/api/test_security.py）
+    escaped_q = q.replace("\\", "\\\\").replace("%", r"\%").replace("_", r"\_")
     search_conditions = []
     if search_type in ["all", "title"]:
-        search_conditions.append(Video.title.ilike(f"%{q}%"))
+        search_conditions.append(Video.title.ilike(f"%{escaped_q}%", escape="\\"))
     
     if search_type in ["all", "tag"] and Video.tags is not None:
-        # 对于数组字段的搜索
+        # 对于数组字段的搜索（数组元素精确匹配，不受 LIKE 通配符影响）
         search_conditions.append(
             Video.tags.any(q)
         )
     
     if search_type in ["all", "author"]:
-        search_conditions.append(User.nickname.ilike(f"%{q}%"))
+        search_conditions.append(User.nickname.ilike(f"%{escaped_q}%", escape="\\"))
         query = query.join(User, Video.author_id == User.id)
     
     if search_conditions:

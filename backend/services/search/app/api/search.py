@@ -28,10 +28,13 @@ async def get_search_suggestions(
     
     suggestions = []
     
+    # 转义 LIKE 通配符（% _ \），使其按字面量匹配（与 feed.py 搜索同源缺陷，统一修复）
+    escaped_q = q.replace("\\", "\\\\").replace("%", r"\%").replace("_", r"\_")
+    
     # 从视频标题中提取建议
     videos = db.query(Video).filter(
         Video.status == "online",
-        Video.title.ilike(f"%{q}%")
+        Video.title.ilike(f"%{escaped_q}%", escape="\\")
     ).limit(limit).all()
     
     for video in videos:
@@ -94,11 +97,12 @@ async def search_videos(
         Video.video_type == "short"
     )
     
-    # 关键字搜索
+    # 关键字搜索（转义 LIKE 通配符，与 feed.py 搜索同源缺陷，统一修复）
     if q:
+        escaped_q = q.replace("\\", "\\\\").replace("%", r"\%").replace("_", r"\_")
         search_conditions = [
-            Video.title.ilike(f"%{q}%"),
-            Video.description.ilike(f"%{q}%")
+            Video.title.ilike(f"%{escaped_q}%", escape="\\"),
+            Video.description.ilike(f"%{escaped_q}%", escape="\\")
         ]
         query = query.filter(or_(*search_conditions))
     

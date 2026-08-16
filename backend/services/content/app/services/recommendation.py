@@ -417,7 +417,8 @@ class PopularityRecommender(RecommendationEngine):
         time_filters = self._get_time_filters(time_window)
         
         # 查询热门视频（综合点赞、评论、收藏）
-        # 热度相同时，优先显示最新发布的视频
+        # 热度分主导排序，created_at 仅作为同分时的次要键
+        # （原实现 created_at 优先导致"高热旧视频排不过冷启动新视频"，缺陷回归见 tests/unit/test_recommendation.py）
         query = self.db.query(
             Video,
             (func.count(Like.id) + 
@@ -431,7 +432,7 @@ class PopularityRecommender(RecommendationEngine):
             Video.video_type == "short",
             Video.parent_video_id.is_(None),
             *time_filters
-        ).group_by(Video.id).order_by(desc(Video.created_at), desc('popularity_score'))
+        ).group_by(Video.id).order_by(desc('popularity_score'), desc(Video.created_at))
         
         results = query.limit(limit * 2).all()
         videos = [result[0] for result in results]
