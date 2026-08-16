@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { contentApi, splitApi } from '../services/api';
+import { contentApi, splitApi, getApiErrorMessage } from '../services/api';
 
 interface Video {
   video_id: string;
@@ -9,6 +9,24 @@ interface Video {
   duration: number;
   created_at: string;
   thumbnail_url?: string;
+}
+
+// 后端 /videos 返回的长视频结构（供 loadVideos 过滤与映射）
+interface ApiLongVideo {
+  id: string;
+  long_video_id: string;
+  title: string;
+  duration: number;
+  created_at: string;
+  cover_url?: string;
+}
+
+// 后端 /split/analyze 返回的知识点结构
+interface ApiKnowledgePoint {
+  id: string;
+  title: string;
+  start_time: number;
+  end_time: number;
 }
 
 interface SplitTask {
@@ -41,7 +59,6 @@ export const VideoSplit: React.FC = () => {
   const [analysisMessage, setAnalysisMessage] = useState<string | null>(null);
   
   // 新增：切分进度相关状态
-  const [splitTaskId, setSplitTaskId] = useState<string | null>(null);
   const [splitProgress, setSplitProgress] = useState<number>(0);
   const [splitStatus, setSplitStatus] = useState<string>('idle');
   const [progressMessage, setProgressMessage] = useState<string>('');
@@ -75,8 +92,8 @@ export const VideoSplit: React.FC = () => {
       const response = await contentApi.getMyVideos({ page: 1, page_size: 20 });
       const videos = response.data?.data?.videos || [];
       // 只显示长视频，过滤掉切分后的片段
-      const longVideos = videos.filter((v: any) => v.long_video_id);
-      const mappedVideos = longVideos.map((v: any) => ({
+      const longVideos = videos.filter((v: ApiLongVideo) => v.long_video_id);
+      const mappedVideos = longVideos.map((v: ApiLongVideo) => ({
         video_id: v.id,
         long_video_id: v.long_video_id,
         title: v.title,
@@ -85,9 +102,31 @@ export const VideoSplit: React.FC = () => {
         thumbnail_url: v.cover_url
       }));
       setVideos(mappedVideos);
-    } catch (err: any) {
+
+      // 并行加载当前用户的切分任务，恢复任务状态（跨会话可见，无需重新分析）
+      try {
+        const tasksRes = await splitApi.getMyTasks();
+        // 后端返回 data 为任务数组
+        const tasks = Array.isArray(tasksRes.data?.data) ? tasksRes.data.data : [];
+        const taskMap: Record<string, SplitTask> = {};
+        for (const t of tasks) {
+          if (t.video_id) {
+            taskMap[t.video_id] = {
+              task_id: t.task_id,
+              video_id: t.video_id,
+              status: t.status,
+              progress: t.progress,
+              progress_message: t.progress_message,
+            };
+          }
+        }
+        setSplitTasks(taskMap);
+      } catch (tasksErr) {
+        console.error('加载切分任务失败:', tasksErr);
+      }
+    } catch (err) {
       console.error('加载视频列表失败:', err);
-      setError(err.response?.data?.detail || '加载视频列表失败');
+      setError(getApiErrorMessage(err, '加载视频列表失败'));
     } finally {
       setLoading(false);
     }
@@ -111,7 +150,6 @@ export const VideoSplit: React.FC = () => {
       
       if (data) {
         const knowledgePoints = data.knowledge_points || [];
-        const usedFallback = data.used_fallback || false;
         const message = data.message;
         
         // 设置提示信息
@@ -120,7 +158,7 @@ export const VideoSplit: React.FC = () => {
         }
         
         // 转换为组件需要的格式
-        const suggestedSegments: SplitSegment[] = knowledgePoints.map((kp: any) => ({
+        const suggestedSegments: SplitSegment[] = knowledgePoints.map((kp: ApiKnowledgePoint) => ({
           id: kp.id,
           title: kp.title,
           startTime: kp.start_time,
@@ -136,10 +174,9 @@ export const VideoSplit: React.FC = () => {
       } else {
         setError('分析失败，请稍后再试');
       }
-    } catch (err: any) {
+    } catch (err) {
       console.error('视频分析失败:', err);
-      const errorMsg = err.response?.data?.detail || err.response?.data?.message || '分析失败，请稍后再试';
-      setError(errorMsg);
+      setError(getApiErrorMessage(err, '分析失败，请稍后再试'));
       // 分析失败时返回列表
       setSelectedVideo(null);
     } finally {
@@ -201,16 +238,15 @@ export const VideoSplit: React.FC = () => {
         }, 500);
       } else {
         // 如果任务还在处理中，开始轮询
-        setSplitTaskId(taskId);
         setSplitProgress(taskData.progress || 0);
         setSplitStatus('processing');
         setProgressMessage(taskData.progress_message || '正在切分视频...');
         startProgressPolling(taskId);
       }
       
-    } catch (err: any) {
+    } catch (err) {
       console.error('创建切分任务失败:', err);
-      setError(err.response?.data?.detail || err.response?.data?.message || '创建切分任务失败');
+      setError(getApiErrorMessage(err, '创建切分任务失败'));
       setSplitting(false);
     }
   };
@@ -263,7 +299,7 @@ export const VideoSplit: React.FC = () => {
       if (taskData.status === 'completed') {
         console.log('切分完成:', taskId);
       }
-    } catch (err: any) {
+    } catch (err) {
       console.error('获取任务状态失败:', err);
     }
   };
@@ -631,7 +667,7 @@ export const VideoSplit: React.FC = () => {
                     <div className="flex-shrink-0">
                       {isCompleted ? (
                         <button
-                          onClick={() => navigate(`/split/result/${task.task_id}`)}
+                          onClick={() => navigate(`/video-split-result/${task.task_id}`)}
                           className="px-3 py-1.5 bg-green-500 text-white rounded-lg text-xs font-semibold
                                      hover:bg-green-600 transition"
                         >

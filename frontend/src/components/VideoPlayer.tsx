@@ -54,9 +54,12 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({ video, isActive }) => 
       setShowShare(false);
     }
 
+    // 拷贝 ref 值，cleanup 闭包中稳定引用（ref.current 可能被后续渲染改写）
+    const video = videoRef.current;
+
     // Cleanup function to ensure video stops when component updates/unmounts
     return () => {
-      videoRef.current?.pause();
+      video?.pause();
     };
   }, [isActive]);
 

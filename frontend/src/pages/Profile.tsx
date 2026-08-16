@@ -3,13 +3,11 @@ import { Share2, Bookmark, Grid, Lock, LogOut, PlayCircle as PlayCircleIcon } fr
 import { useAuth } from '../context/AuthContext';
 import { UserProfileStats, type LearnRecord } from '../components/UserProfileStats';
 import { EditProfileModal } from '../components/EditProfileModal';
-import { MOCK_VIDEOS } from '../services/mockData';
 import { learnApi } from '../services/api';
 
 export const Profile: React.FC = () => {
   const { user, logout } = useAuth();
   const [records, setRecords] = useState<LearnRecord[]>([]);
-  const [loading, setLoading] = useState(true);
   const [isEditOpen, setIsEditOpen] = useState(false);
 
   // Fetch records from backend
@@ -23,8 +21,6 @@ export const Profile: React.FC = () => {
         }
       } catch (error) {
         console.error("Failed to fetch learn records", error);
-      } finally {
-        setLoading(false);
       }
     };
 

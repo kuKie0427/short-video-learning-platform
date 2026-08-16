@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { X, ChevronLeft, Camera, ChevronRight, Loader2 } from 'lucide-react';
+import { ChevronLeft, Camera, ChevronRight } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { splitApi } from '../services/api';
 
@@ -49,7 +49,7 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({ onClose }) =
         }
       };
       reader.readAsDataURL(file);
-    } catch (error) {
+    } catch {
       setLoading(false);
     }
   };

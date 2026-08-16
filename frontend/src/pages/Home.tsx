@@ -5,12 +5,25 @@ import { MOCK_VIDEOS, type Video } from '../services/mockData';
 import { VideoPlayer } from '../components/VideoPlayer';
 import { videoApi } from '../services/api';
 
+// 后端 /feed/recommend 返回的视频结构（字段与前端 Video 类型不同，映射时显式声明）
+interface ApiVideo {
+  id: string;
+  title: string;
+  description?: string;
+  play_url?: string;
+  cover_url?: string;
+  author_id?: string;
+  author_nickname?: string;
+  author_avatar?: string;
+  like_count?: number;
+  comment_count?: number;
+}
+
 export const Home: React.FC = () => {
   const navigate = useNavigate();
   const [activeindex, setActiveIndex] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
   const [videos, setVideos] = useState<Video[]>([]);
-  const [loading, setLoading] = useState(true);
 
   // Load videos from API
   useEffect(() => {
@@ -18,7 +31,7 @@ export const Home: React.FC = () => {
       try {
         const response = await videoApi.getRecommendFeed(1);
         if (response.data?.data?.videos && response.data.data.videos.length > 0) {
-          const apiVideos = response.data.data.videos.map((v: any) => ({
+          const apiVideos = response.data.data.videos.map((v: ApiVideo) => ({
             id: v.id,
             title: v.title,
             description: v.description,
@@ -42,8 +55,6 @@ export const Home: React.FC = () => {
         console.error('加载视频失败:', error);
         // 加载失败时降级到Mock数据
         setVideos(MOCK_VIDEOS);
-      } finally {
-        setLoading(false);
       }
     };
     loadVideos();

@@ -12,9 +12,8 @@ interface SearchFilters {
   tags: string[];
 }
 
-interface SearchResult extends Video {
-  // Extend if needed, for now using Video type
-}
+// 与 Video 类型等价（暂无扩展字段），用 type 别名替代空 interface
+type SearchResult = Video;
 
 // 后端搜索API返回的数据结构
 interface SearchApiResult {
@@ -162,10 +161,12 @@ export const Search: React.FC = () => {
   };
 
   // Effect to re-search when filters change (if already searched)
+  // 有意不加入 handleSearch/hasSearched：二者每次渲染重建，加入会导致每次渲染都重新搜索。
   useEffect(() => {
     if (hasSearched) {
       handleSearch();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filters.duration_range, filters.sort_by, filters.tags.length]); // Dependencies for filter changes
 
   return (
@@ -238,7 +239,7 @@ export const Search: React.FC = () => {
           <select 
             className="bg-gray-100 text-xs px-3 py-1.5 rounded-full border-none outline-none text-gray-700 appearance-none font-medium"
             value={filters.duration_range || ''}
-            onChange={(e) => setFilters(prev => ({ ...prev, duration_range: e.target.value as any || undefined }))}
+            onChange={(e) => setFilters(prev => ({ ...prev, duration_range: (e.target.value as SearchFilters['duration_range']) || undefined }))}
           >
             <option value="">全部时长</option>
             <option value="0-60">1分钟内</option>
@@ -254,7 +255,7 @@ export const Search: React.FC = () => {
             ].map(opt => (
               <button
                 key={opt.id}
-                onClick={() => setFilters(prev => ({ ...prev, sort_by: opt.id as any }))}
+                onClick={() => setFilters(prev => ({ ...prev, sort_by: opt.id as SearchFilters['sort_by'] }))}
                 className={clsx(
                   "px-3 py-1 rounded-full text-xs font-medium transition-colors",
                   filters.sort_by === opt.id ? "bg-white shadow-sm text-blue-600" : "text-gray-500"

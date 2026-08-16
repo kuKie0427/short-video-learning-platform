@@ -14,7 +14,10 @@ export const Login: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
 
   // Get the redirect path from location state, or default to home
-  const from = (location.state as any)?.from?.pathname || '/';
+  interface LocationState {
+    from?: { pathname?: string };
+  }
+  const from = (location.state as LocationState | null)?.from?.pathname || '/';
 
   const handleSendCode = async () => {
     if (phone.length === 11) {
@@ -29,7 +32,7 @@ export const Login: React.FC = () => {
             setIsLoading(false);
             // alert('验证码已发送: 123456'); // For demo
         }, 1000);
-      } catch (error) {
+      } catch {
         alert('发送验证码失败');
         setIsLoading(false);
       }
@@ -56,7 +59,7 @@ export const Login: React.FC = () => {
             });
             navigate(from, { replace: true });
         }, 1000);
-      } catch (error) {
+      } catch {
         alert('登录失败');
         setIsLoading(false);
       }

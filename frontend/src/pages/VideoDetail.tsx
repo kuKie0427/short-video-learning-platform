@@ -57,7 +57,7 @@ export const VideoDetail: React.FC = () => {
             shares: res.data.shares || 0
           });
         }
-      } catch (error) {
+      } catch {
         console.log('Failed to fetch video from API, using fallback');
         // API失败，使用默认视频
         setVideo(MOCK_VIDEOS[0]);

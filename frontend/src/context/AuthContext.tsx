@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react';
 
 interface User {
   id: string;
@@ -30,12 +30,14 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [token, setToken] = useState<string | null>(localStorage.getItem('token'));
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
-  // 初始化时检查本地 Token
-  useEffect(() => {
-    checkAuth();
+  // useCallback 稳定函数引用，避免每次渲染重建导致 effect 重复执行
+  const logout = useCallback(() => {
+    localStorage.removeItem('token');
+    setToken(null);
+    setUser(null);
   }, []);
 
-  const checkAuth = async () => {
+  const checkAuth = useCallback(async () => {
     const storedToken = localStorage.getItem('token');
     
     // 开发环境：自动使用默认UUID token
@@ -73,18 +75,17 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       }
     }
     setIsLoading(false);
-  };
+  }, [logout]);
+
+  // 初始化时检查本地 Token
+  useEffect(() => {
+    checkAuth();
+  }, [checkAuth]);
 
   const login = (newToken: string, newUser: User) => {
     localStorage.setItem('token', newToken);
     setToken(newToken);
     setUser(newUser);
-  };
-
-  const logout = () => {
-    localStorage.removeItem('token');
-    setToken(null);
-    setUser(null);
   };
 
   const updateUser = (updatedUser: User) => {
@@ -107,6 +108,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   );
 };
 
+// react-refresh: context 与其消费 hook 同文件导出是标准模式，HMR 边界已知，此处豁免
+// eslint-disable-next-line react-refresh/only-export-components
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (context === undefined) {

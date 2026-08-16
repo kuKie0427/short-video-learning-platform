@@ -42,6 +42,37 @@ api.interceptors.response.use(
   }
 );
 
+// —— API 边界类型（与后端契约对应）——
+
+/** 后端统一错误结构：错误信息在 response.data.detail / message */
+export function getApiErrorMessage(err: unknown, fallback: string): string {
+  const e = err as { response?: { data?: { detail?: string; message?: string } } };
+  return e.response?.data?.detail || e.response?.data?.message || fallback;
+}
+
+/** 直连切分请求（POST /split/direct-split） */
+export interface DirectSplitRequest {
+  long_video_id: string;
+  knowledge_points: unknown[];
+  organization_mode: string;
+}
+
+/** 异步切分任务请求（POST /split/tasks） */
+export interface SplitTaskRequest {
+  long_video_id: string;
+  [key: string]: unknown;
+}
+
+/** 个人资料更新（PUT /auth/profile） */
+export interface ProfileUpdateRequest {
+  nickname?: string;
+  bio?: string;
+  gender?: string;
+  location?: string;
+  school?: string;
+  avatar_url?: string;
+}
+
 export const authApi = {
   sendCode: (phone: string, scene: 'register' | 'login') => 
     api.post('/auth/send_code', { phone, scene }),
@@ -80,15 +111,17 @@ export const splitApi = {
   analyze: (long_video_id: string) => 
     api.post('/split/analyze', { long_video_id }, { timeout: 600000 }), // 10分钟超时
   // 直接切分视频（基于已有分析结果，不重复分析）
-  directSplit: (data: any) => api.post('/split/direct-split', data, { timeout: 300000 }), // 5分钟超时
-  createTask: (data: any) => api.post('/split/tasks', data, { timeout: 60000 }), // 60秒超时
+  directSplit: (data: DirectSplitRequest) => api.post('/split/direct-split', data, { timeout: 300000 }), // 5分钟超时
+  createTask: (data: SplitTaskRequest) => api.post('/split/tasks', data, { timeout: 60000 }), // 60秒超时
   getTaskStatus: (taskId: string) => api.get(`/split/tasks/${taskId}`),
+  // 当前用户的切分任务列表（列表页恢复任务状态用）
+  getMyTasks: () => api.get('/split/tasks'),
   // 获取完整切分结果
   getTaskResult: (taskId: string) => api.get(`/split/tasks/${taskId}/result`),
   // 发布选中的片段到主页
   publishSegments: (data: { segment_ids: string[] }) => api.post('/split/publish-segments', data),
   // User profile APIs
-  updateProfile: (data: any) => api.put('/auth/profile', data),
+  updateProfile: (data: ProfileUpdateRequest) => api.put('/auth/profile', data),
   uploadImage: (base64: string) => api.post('/upload/image', { image: base64 }),
 };
 

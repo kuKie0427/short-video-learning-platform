@@ -1,4 +1,4 @@
-import React, { useRef, useState, useEffect } from 'react';
+import React, { useRef, useState, useEffect, useCallback } from 'react';
 import { Play, Pause, CheckCircle, HelpCircle, X, Loader2 } from 'lucide-react';
 import { videoApi, learnApi } from '../services/api';
 
@@ -15,6 +15,8 @@ interface HeartbeatPayload {
   video_id: string;
   position: number;
   duration: number;
+  buffered: number;
+  playing: boolean;
 }
 
 interface VideoLearningPlayerProps {
@@ -153,7 +155,8 @@ export const VideoLearningPlayer: React.FC<VideoLearningPlayerProps> = ({
   };
 
   // --- 2. Heartbeat System ---
-  const sendHeartbeat = async (playing: boolean, forcePosition?: number) => {
+  // 依赖只有 normalizedVideoId（随 videoId 变化），函数引用稳定，可安全放入 effect 依赖
+  const sendHeartbeat = useCallback(async (playing: boolean, forcePosition?: number) => {
     if (!videoRef.current) return;
     
     // Use ref or forcePosition to get latest value without state dependency
@@ -169,7 +172,12 @@ export const VideoLearningPlayer: React.FC<VideoLearningPlayerProps> = ({
     const payload: HeartbeatPayload = {
       video_id: normalizedVideoId,
       position: pos,
-      duration: dur
+      duration: dur,
+      // 与后端 /learn/heartbeat 契约一致：上报已缓冲时长与播放状态
+      buffered: videoRef.current.buffered.length > 0
+        ? videoRef.current.buffered.end(videoRef.current.buffered.length - 1)
+        : 0,
+      playing
     };
 
     console.log('📤 Sending heartbeat payload:', JSON.stringify(payload), 'Types:', {
@@ -191,7 +199,7 @@ export const VideoLearningPlayer: React.FC<VideoLearningPlayerProps> = ({
       console.error('❌ Heartbeat failed:', error);
       setHeartbeatStatus('error');
     }
-  };
+  }, [normalizedVideoId]);
 
   // Timer Effect
   useEffect(() => {
@@ -216,7 +224,7 @@ export const VideoLearningPlayer: React.FC<VideoLearningPlayerProps> = ({
         clearInterval(heartbeatTimerRef.current);
       }
     };
-  }, [isPlaying, videoId]);
+  }, [isPlaying, videoId, sendHeartbeat]);
 
   // Cleanup & AppState Listener Effect
   useEffect(() => {
@@ -237,7 +245,7 @@ export const VideoLearningPlayer: React.FC<VideoLearningPlayerProps> = ({
       console.log('🛑 Player unmount cleanup');
       sendHeartbeat(false);
     };
-  }, [videoId]);
+  }, [videoId, sendHeartbeat]);
 
 
   // --- 3. Completion Logic & Progress ---

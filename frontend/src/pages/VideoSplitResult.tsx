@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { splitApi } from '../services/api';
+import { splitApi, getApiErrorMessage } from '../services/api';
 
 interface SplitSegment {
   id: string;
@@ -34,13 +34,7 @@ export default function VideoSplitResult() {
   const [selectedSegments, setSelectedSegments] = useState<Set<string>>(new Set());
   const [uploading, setUploading] = useState(false);
 
-  useEffect(() => {
-    if (taskId) {
-      loadSplitResult();
-    }
-  }, [taskId]);
-
-  const loadSplitResult = async () => {
+  const loadSplitResult = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
@@ -54,13 +48,19 @@ export default function VideoSplitResult() {
       
       setTask(data.task);
       setSegments(data.segments || []);
-    } catch (err: any) {
+    } catch (err) {
       console.error('加载切分结果失败:', err);
-      setError(err.response?.data?.detail || '加载切分结果失败');
+      setError(getApiErrorMessage(err, '加载切分结果失败'));
     } finally {
       setLoading(false);
     }
-  };
+  }, [taskId]);
+
+  useEffect(() => {
+    if (taskId) {
+      loadSplitResult();
+    }
+  }, [taskId, loadSplitResult]);
 
   const formatTime = (seconds: number): string => {
     const mins = Math.floor(seconds / 60);
@@ -104,9 +104,9 @@ export default function VideoSplitResult() {
 
       alert(`成功发布 ${segmentIds.length} 个片段到主页！`);
       setSelectedSegments(new Set());
-    } catch (err: any) {
+    } catch (err) {
       console.error('发布失败:', err);
-      alert(err.response?.data?.detail || '发布失败，请重试');
+      alert(getApiErrorMessage(err, '发布失败，请重试'));
     } finally {
       setUploading(false);
     }

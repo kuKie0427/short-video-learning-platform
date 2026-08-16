@@ -34,7 +34,7 @@ export const Upload: React.FC = () => {
             ].map((mode) => (
               <button
                 key={mode.id}
-                onClick={() => setSplitMode(mode.id as any)}
+                onClick={() => setSplitMode(mode.id as 'auto' | 'manual' | 'hybrid')}
                 className={clsx(
                   "flex flex-col items-center justify-center p-3 rounded-xl border-2 transition-all",
                   splitMode === mode.id 

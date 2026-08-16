@@ -34,8 +34,8 @@ export const useResumableUpload = () => {
   const getStorageKey = (fileName: string, fileSize: number) => 
     `upload_${fileName}_${fileSize}`;
 
-  // Retry logic wrapper
-  const uploadChunkWithRetry = async (
+  // Retry logic wrapper（仅依赖模块级 uploadApi/MAX_RETRIES，函数引用稳定）
+  const uploadChunkWithRetry = useCallback(async (
     url: string, 
     uploadId: string, 
     chunkIndex: number, 
@@ -52,7 +52,7 @@ export const useResumableUpload = () => {
       }
       throw error;
     }
-  };
+  }, []);
 
   const startUpload = useCallback(async (file: File) => {
     setState(prev => ({ ...prev, status: 'compressing', error: null }));
@@ -162,15 +162,15 @@ export const useResumableUpload = () => {
       localStorage.removeItem(storageKey);
       setState(prev => ({ ...prev, status: 'completed', uploadedVideoId: videoId }));
 
-    } catch (err: any) {
+    } catch (err) {
       console.error(err);
-      setState(prev => ({ 
-        ...prev, 
-        status: 'error', 
-        error: err.message || '上传失败，请重试' 
+      setState(prev => ({
+        ...prev,
+        status: 'error',
+        error: err instanceof Error ? err.message : '上传失败，请重试'
       }));
     }
-  }, []);
+  }, [uploadChunkWithRetry]);
 
   const reset = () => {
     setState({

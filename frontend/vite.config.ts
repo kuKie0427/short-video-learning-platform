@@ -1,3 +1,4 @@
+/// <reference types="vitest" />
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import path from 'path'
@@ -32,5 +33,13 @@ export default defineConfig({
         changeOrigin: true,
       },
     },
+  },
+  test: {
+    environment: 'jsdom',
+    globals: false,
+    setupFiles: ['./src/test/setup.ts'],
+    css: false,
+    // 登录页测试使用真实定时器等待 mock 延迟（user-event 与 fake timers 兼容问题），放宽超时
+    testTimeout: 15000,
   },
 })
