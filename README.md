@@ -8,8 +8,8 @@
 
 采用微服务架构，提供完整的视频处理、内容推荐、课程管理等功能
 
-[![Tests](https://img.shields.io/badge/tests-266%2F266%20passing-brightgreen)]()
-[![Coverage](https://img.shields.io/badge/coverage-75%25-yellow)]()
+[![Tests](https://img.shields.io/badge/tests-304%20passed-brightgreen)]()
+[![Coverage](https://img.shields.io/badge/coverage-76%25-yellow)]()
 [![Python](https://img.shields.io/badge/python-3.11%2B-blue)]()
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115%2B-009688)]()
 [![React](https://img.shields.io/badge/React-18.3%2B-61dafb)]()
@@ -156,7 +156,7 @@ my-project/
 │   │   ├── uploads/                # 用户上传文件
 │   │   └── temp/                   # 临时处理文件
 │   ├── docs/                       # 完整的文档中心
-│   ├── tests/                      # 测试套件（266 用例）
+│   ├── tests/                      # 测试套件（304 用例：API 156 + 单元 148）
 │   ├── scripts/                    # 工具脚本
 │   ├── alembic/                    # 数据库迁移
 │   └── docker-compose.yml          # Docker 编排文件
@@ -370,10 +370,13 @@ my-project/
 |------|------|------|
 | ✅ **微服务数量** | 7个服务 + 1个网关 | 高内聚低耦合的架构设计 |
 | ✅ **API接口** | 56 个 | 完整的RESTful API |
-| ✅ **测试通过率** | 266/266 (100%) | 高质量代码保障（实测） |
-| ✅ **代码覆盖率** | 75% | 核心模块 74%-98%（实测） |
-| ✅ **响应时间** | P95 36ms | 性能基线实测（20 并发） |
-| ✅ **并发处理** | RPS 15.5 | Locust 基线实测（20 并发） |
+| ✅ **测试通过率** | 304 通过 | 后端全量回归 ~30s（实测） |
+| ✅ **代码覆盖率** | 76% | 核心模块 74%-98%（实测，含 70% 门禁） |
+| ✅ **前端单测** | 10 通过 | Vitest + React Testing Library |
+| ✅ **前端质量门禁** | ESLint 0 error + 构建通过 | 进 CI（`npm run lint` + `npm run build`） |
+| ✅ **E2E 冒烟** | 6 通过 | Playwright 真实后端链路（进 CI） |
+| ✅ **响应时间** | 聚合 P95 53ms | 性能基线实测（20 并发，详见 perf/BASELINE.md） |
+| ✅ **并发处理** | RPS 15.5 | Locust 基线实测（20 并发，0 失败） |
 
 ### AI性能指标
 | 模型/算法 | 指标 | 数值 |
@@ -405,6 +408,9 @@ my-project/
 
 ### 🔧 开发文档
 - [**运行测试**](./backend/docs/运行测试.md) - 测试环境配置和运行指南
+- [**测试设计文档**](./backend/docs/测试设计文档.md) - 用例设计方法论（等价类/边界值/场景法/缺陷驱动）
+- [**E2E 冒烟测试**](./e2e/README.md) - Playwright 端到端测试（真实后端链路）
+- [**性能基线**](./backend/perf/BASELINE.md) - Locust 压测结果与性能门禁
 - [**故障排查指南**](./backend/docs/故障排查指南.md) - 常见问题解决方案
 - [**数据库本地部署**](./backend/docs/数据库本地部署.md) - PostgreSQL本地部署指南
 - [**文档中心**](./backend/docs/README.md) - 完整的文档索引
@@ -607,23 +613,27 @@ pytest -n auto
 
 ### 测试配置
 
-测试使用独立的SQLite数据库，不会影响开发数据库:
-
-```python
-# tests/conftest.py
-DATABASE_URL = "sqlite:///./test.db"
-```
+后端测试使用**独立 PostgreSQL 测试库**（`short_video_platform_test`），每个用例建表+删表完全隔离，
+不走 SQLite——真实约束/索引/级联是抓缺陷的前提（详见 [测试设计文档](./backend/docs/测试设计文档.md)）。
 
 ### 测试统计
 
 ```
-📊 测试概览:
-├── 总测试用例: 266（API 129 + 单元 137）
-├── 通过率: 266/266 (100%)
-├── 代码覆盖率: 75%（实测）
-├── API测试: 129
-├── 单元测试: 137
-└── 集成测试: 待添加
+📊 后端测试概览（实测，全量回归 ~30s）:
+├── 总测试用例: 304 全通过
+├── 通过率: 100%（2 个历史 xfail 缺陷已修复转正）
+├── 代码覆盖率: 76%（实测，--cov-fail-under=70 门禁）
+├── API测试: 156（含安全/幂等性专项）
+└── 单元测试: 148（推荐算法/AI 降级/工具函数）
+
+📊 前端测试概览（Vitest + React Testing Library）:
+├── 登录页行为 4 例（等价类/边界值）
+├── AuthContext 状态迁移 3 例
+└── 路由守卫 3 例
+
+📊 E2E 冒烟（Playwright + 真实后端链路）:
+└── 登录/首页/搜索/上传/切分 6 例（进 GitHub Actions CI）
+```
 
 📁 测试分类:
 ├── 认证测试 (test_auth.py)
@@ -635,13 +645,21 @@ DATABASE_URL = "sqlite:///./test.db"
 │   ├── 视频信息 ✅
 │   └── 播放统计 ✅
 ├── 推荐测试 (test_recommendation.py)
-│   ├── 推荐流 ✅
-│   ├── 热门视频 ✅
-│   └── 个性化推荐 ✅
+│   ├── 画像权重/标签排序 ✅
+│   ├── 协同过滤 Golden Path ✅
+│   └── 混合推荐权重影响 ✅
 ├── 切分测试 (test_split.py)
 │   ├── 视频分析 ✅
 │   ├── 分割处理 ✅
 │   └── 发布管理 ✅
+├── 幂等性测试 (test_idempotency.py)
+│   ├── 点赞切换/计数一致 ✅
+│   ├── 重复关注/分片重传 ✅
+│   └── 唯一约束并发防线 ✅
+├── 安全测试 (test_security.py)
+│   ├── SQL注入/LIKE通配符 ✅
+│   ├── 认证边界矩阵(401/403) ✅
+│   └── 输入边界/404语义 ✅
 └── 模型测试 (test_models.py)
     ├── 数据模型 ✅
     ├── 关系验证 ✅
@@ -778,7 +796,7 @@ pytest tests/ -v
 - [x] 消息通知系统
 - [x] 微服务架构实现
 - [x] Docker容器化部署
-- [x] 单元测试和API测试（266 用例）
+- [x] 单元测试和API测试（304 用例，含幂等性/安全专项）
 - [x] 完整文档体系
 
 ### 进行中 🚧

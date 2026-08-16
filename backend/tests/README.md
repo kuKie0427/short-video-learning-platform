@@ -2,16 +2,22 @@
 
 ## 📊 测试概况
 
-### 当前状态（2025-12）
-- ✅ **通过率**: 266/266 (100%)
-- 📊 **代码覆盖率**: 75%（实测）
-- 🧪 **测试用例**: 266 个（API 129 + 单元 137）
-- 📁 **测试文件**: 15 个
+### 当前状态（2026-08）
+- ✅ **通过率**: 304 通过（全绿，全量回归 ~30 秒实测）
+- 📊 **代码覆盖率**: 76%（实测，pytest.ini 配置 `--cov-fail-under=70` 门禁）
+- 🧪 **测试用例**: 304 个（API 156 + 单元 148）
+- 📁 **测试文件**: 32 个
 
 ### 测试分类
-- **API测试**: 15个文件，129 用例
-- **单元测试**: 16个文件，137 用例
+- **API测试**: 17个文件，156 用例（含幂等性 test_idempotency.py、安全 test_security.py 专项）
+- **单元测试**: 15个文件，148 用例
 - **集成测试**: 覆盖所有微服务
+
+### 缺陷管理闭环（2026-08 完成）
+- 原 2 个 `xfail(strict)` 已知缺陷已修复并转正为普通回归用例：
+  1. **搜索 LIKE 通配符未转义**（`q=%`/`q=_` 可匹配全部视频）→ `ilike(..., escape='\\')` 转义（`services/content/app/api/feed.py`、`services/search/app/api/search.py`），回归用例见 `tests/api/test_security.py`
+  2. **热度推荐排序被时间覆盖**（高热旧视频排不过冷新视频）→ 热度分主导、created_at 仅作同分次要键（`services/content/app/services/recommendation.py`），回归用例见 `tests/unit/test_recommendation.py`
+- 方法论：复现用例（xfail strict 强制回归）→ 修复 → 移除标记转绿，详见 [测试设计文档](../docs/测试设计文档.md)
 
 ## 测试结构
 
@@ -33,7 +39,9 @@ tests/
 │   ├── test_learn.py     # 学习进度接口
 │   ├── test_inbox.py     # 消息通知接口
 │   ├── test_search.py    # 搜索接口
-│   └── test_follow.py    # 关注功能接口
+│   ├── test_follow.py    # 关注功能接口
+│   ├── test_idempotency.py  # 幂等性与并发防护（点赞切换/重复关注/分片重传/唯一约束）
+│   └── test_security.py     # 安全与输入校验（SQL注入/认证边界/422边界/404语义）
 └── fixtures/             # 测试数据生成器
     └── sample_data.py
 ```
