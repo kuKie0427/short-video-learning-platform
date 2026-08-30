@@ -26,14 +26,12 @@ sys.path.insert(0, backend_dir)
 from common.models.base import Base
 from common.models import User, Video, Course, LearnRecord, Like, Favorite, Comment, Follow
 from common.config.settings import settings
-from common.database.connection import get_db, get_redis
-from common.utils.redis_client import store_sms_code, delete_sms_code
+from common.database.connection import get_db
 
 fake = Faker('zh_CN')
 
 # 测试数据库URL - 使用PostgreSQL测试数据库
 # 优先使用环境变量，否则使用默认配置
-import os
 # 测试时优先使用127.0.0.1（避免localhost解析为IPv6导致的问题）
 # 如果DB_HOST是postgres（Docker环境），则使用127.0.0.1
 test_db_host = os.getenv("TEST_DB_HOST") or (settings.DB_HOST if settings.DB_HOST != "postgres" else "127.0.0.1")
@@ -173,26 +171,20 @@ def db() -> Generator[Session, None, None]:
             session.close()
             # 清理所有表
             # 由于videos和long_videos之间存在循环依赖，直接使用CASCADE删除
+            # 注意：清理失败必须显式暴露（表残留会让下个用例 create_all 静默跳过 → 跑在旧表结构上）
             try:
                 with engine.begin() as conn:
                     # 获取所有表名
                     table_names = [table.name for table in Base.metadata.sorted_tables]
                     # 使用CASCADE删除所有表，让PostgreSQL自动处理依赖关系
                     for table_name in reversed(table_names):
-                        try:
-                            conn.execute(text(f"DROP TABLE IF EXISTS {table_name} CASCADE"))
-                        except Exception as e:
-                            # 如果表不存在或其他错误，继续删除其他表
-                            pass
+                        conn.execute(text(f"DROP TABLE IF EXISTS {table_name} CASCADE"))
             except Exception as drop_error:
-                # 如果批量删除失败，尝试逐个删除
+                # 兜底：drop_all，再失败则显式 fail，杜绝静默吞错
                 try:
                     Base.metadata.drop_all(bind=engine)
                 except Exception:
-                    # 如果还是失败，至少尝试删除主要表
-                    with engine.begin() as conn:
-                        conn.execute(text("DROP TABLE IF EXISTS videos CASCADE"))
-                        conn.execute(text("DROP TABLE IF EXISTS long_videos CASCADE"))
+                    pytest.fail(f"测试数据库表清理失败，存在脏表残留风险: {drop_error}")
     except Exception as e:
         # 提供更友好的错误信息
         import pytest
@@ -373,28 +365,11 @@ def test_user2(db: Session) -> User:
     return user
 
 
-@pytest.fixture
-def admin_user(db: Session) -> User:
-    """创建管理员用户"""
-    user = User(
-        id=str(fake.uuid4()),
-        phone=fake.unique.phone_number()[:20],
-        nickname="管理员",
-        avatar_url=fake.image_url(),
-        language="zh-CN",
-        roles=["admin", "learner"]
-    )
-    db.add(user)
-    db.commit()
-    db.refresh(user)
-    return user
-
-
 def create_access_token(user_id: str, expires_delta: timedelta = None) -> str:
     """创建JWT token（用于测试）"""
     if expires_delta is None:
         expires_delta = timedelta(minutes=settings.JWT_ACCESS_TOKEN_EXPIRE_MINUTES)
-    
+
     expire = datetime.now(timezone.utc) + expires_delta
     to_encode = {"sub": user_id, "exp": expire}
     encoded_jwt = jwt.encode(to_encode, settings.JWT_SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
@@ -416,13 +391,6 @@ def auth_headers_user2(test_user2: User) -> dict:
 
 
 @pytest.fixture
-def expired_auth_headers(test_user: User) -> dict:
-    """生成过期的认证头"""
-    token = create_access_token(str(test_user.id), expires_delta=timedelta(minutes=-1))
-    return {"Authorization": f"Bearer {token}"}
-
-
-@pytest.fixture
 def test_video(db: Session, test_user: User) -> Video:
     """创建测试视频"""
     video = Video(
@@ -436,28 +404,6 @@ def test_video(db: Session, test_user: User) -> Video:
         cover_url=fake.image_url(),
         language="zh-CN",
         status="online",
-        video_type="short"
-    )
-    db.add(video)
-    db.commit()
-    db.refresh(video)
-    return video
-
-
-@pytest.fixture
-def test_video_pending(db: Session, test_user: User) -> Video:
-    """创建待审核的测试视频"""
-    video = Video(
-        id=str(fake.uuid4()),
-        author_id=test_user.id,
-        title=fake.sentence()[:200],
-        description=fake.text()[:500],
-        tags=["测试"],
-        duration=120,
-        play_url=fake.url(),
-        cover_url=fake.image_url(),
-        language="zh-CN",
-        status="pending",
         video_type="short"
     )
     db.add(video)
@@ -489,31 +435,26 @@ def test_course(db: Session, test_user: User) -> Course:
     return course
 
 
-@pytest.fixture
-def test_sms_code(test_user: User) -> str:
-    """创建测试验证码并存储到Redis（模拟）"""
-    code = "123456"
-    phone = test_user.phone
-    # 注意：这里需要实际的Redis连接，测试时可能需要Mock
-    # 为了简化，我们假设验证码已存储
-    try:
-        store_sms_code(phone, code, 300)
-    except Exception:
-        # Redis不可用时跳过
-        pass
-    return code
-
-
 @pytest.fixture(autouse=True)
-def cleanup_redis():
-    """清理Redis测试数据（如果Redis可用）"""
+def _lock_redis_memory_store(monkeypatch):
+    """锁定 Redis 走内存降级路径，保证测试行为与 Redis 是否可用无关
+
+    背景：get_redis() 在本机连不上 Redis 时返回 None（走 _memory_store 内存降级），
+    Redis 可用时走真实 hash 存储——两条路径行为不同（TTL 清理、attempts 类型），
+    同一套测试在不同环境断言的是不同实现路径。
+    这里统一 patch 掉 get_redis 的**所有入口**返回 None，锁定内存路径：
+    - redis_client 模块（短信验证码）
+    - stats 模块（from ..database.connection import get_redis，模块级绑定）
+    - split 模块（from common.utils.redis_client import get_redis，模块级绑定）
+    并在每个用例后清空内存 store，避免验证码 key 跨用例残留。
+    """
+    from common.utils import redis_client as _redis_client_mod
+    from common.utils import stats as _stats_mod
+    from services.split.app.api import split as _split_mod
+
+    monkeypatch.setattr(_redis_client_mod, "get_redis", lambda: None)
+    monkeypatch.setattr(_stats_mod, "get_redis", lambda: None)
+    monkeypatch.setattr(_split_mod, "get_redis", lambda: None)
     yield
-    # 测试后清理Redis数据
-    try:
-        redis_client = get_redis()
-        if redis_client:
-            # 清理测试相关的key（根据实际情况调整）
-            pass
-    except Exception:
-        pass
+    _redis_client_mod._memory_store.clear()
 
