@@ -10,8 +10,8 @@
 - 🧹 **warnings**: 220 条 → 1 条（已治理 Pydantic/SQLAlchemy/FastAPI 弃用警告，`-W error::DeprecationWarning` 可安全开启）
 
 ### 测试分类
-- **API测试**: 15个文件，165 用例（含幂等性 test_idempotency.py、安全 test_security.py 专项）
-- **单元测试**: 14个文件，151 用例
+- **API测试**: 17个文件，165 用例（含幂等性 test_idempotency.py、安全 test_security.py 专项）
+- **单元测试**: 15个文件，151 用例
 - **集成测试**: 覆盖所有微服务
 - **数据驱动**: 43 例参数化（认证边界矩阵、输入校验矩阵、登录验证码矩阵、工厂分支矩阵等）
 
