@@ -3,20 +3,26 @@
 ## 📊 测试概况
 
 ### 当前状态（2026-08）
-- ✅ **通过率**: 304 通过（全绿，全量回归 ~30 秒实测）
-- 📊 **代码覆盖率**: 76%（实测，pytest.ini 配置 `--cov-fail-under=70` 门禁）
-- 🧪 **测试用例**: 304 个（API 156 + 单元 148）
+- ✅ **通过率**: 315 通过（全绿，全量回归 ~13 秒实测）
+- 📊 **代码覆盖率**: 75.5%（实测，pytest.ini 配置 `--cov-fail-under=70` 门禁）
+- 🧪 **测试用例**: 315 个（API 165 + 单元 151），其中 43 例为参数化（数据驱动）矩阵
 - 📁 **测试文件**: 32 个
+- 🧹 **warnings**: 220 条 → 1 条（已治理 Pydantic/SQLAlchemy/FastAPI 弃用警告，`-W error::DeprecationWarning` 可安全开启）
 
 ### 测试分类
-- **API测试**: 17个文件，156 用例（含幂等性 test_idempotency.py、安全 test_security.py 专项）
-- **单元测试**: 15个文件，148 用例
+- **API测试**: 15个文件，165 用例（含幂等性 test_idempotency.py、安全 test_security.py 专项）
+- **单元测试**: 14个文件，151 用例
 - **集成测试**: 覆盖所有微服务
+- **数据驱动**: 43 例参数化（认证边界矩阵、输入校验矩阵、登录验证码矩阵、工厂分支矩阵等）
 
 ### 缺陷管理闭环（2026-08 完成）
 - 原 2 个 `xfail(strict)` 已知缺陷已修复并转正为普通回归用例：
   1. **搜索 LIKE 通配符未转义**（`q=%`/`q=_` 可匹配全部视频）→ `ilike(..., escape='\\')` 转义（`services/content/app/api/feed.py`、`services/search/app/api/search.py`），回归用例见 `tests/api/test_security.py`
   2. **热度推荐排序被时间覆盖**（高热旧视频排不过冷新视频）→ 热度分主导、created_at 仅作同分次要键（`services/content/app/services/recommendation.py`），回归用例见 `tests/unit/test_recommendation.py`
+- 2026-08 二轮 review 新增修复：
+  3. **learn complete 字段名错配**（`completed_ratio` 被 Pydantic 忽略，断言从未生效）→ 改为 `completion_rate` 并补 DB 落库断言（`tests/api/test_learn.py`）
+  4. **search hot 排序伪实现**（与 latest 同序）→ 互动总量聚合排序（`services/search/app/api/search.py`）
+  5. **无效 base64 返回 500**（客户端输入错误当服务器错误）→ binascii.Error 单独捕获返回 422（`services/upload/app/api/upload.py`）
 - 方法论：复现用例（xfail strict 强制回归）→ 修复 → 移除标记转绿，详见 [测试设计文档](../docs/测试设计文档.md)
 
 ## 测试结构
@@ -203,14 +209,14 @@ psql -h localhost -U app_user -c "CREATE DATABASE short_video_platform_test;"
 
 ### 常用Fixtures
 
-- `db` - 测试数据库会话
-- `client` - FastAPI测试客户端
-- `test_user` - 测试用户
-- `test_user2` - 第二个测试用户
-- `admin_user` - 管理员用户
+- `db` - 测试数据库会话（每个用例建表+删表隔离）
+- `client` - Content 服务测试客户端
+- `auth_client` / `upload_client` / `split_client` / `course_client` / `search_client` / `notification_client` - 各服务测试客户端
+- `test_user` / `test_user2` - 测试用户
 - `auth_headers` - 认证头（基于test_user）
 - `test_video` - 测试视频
 - `test_course` - 测试课程
+- `_lock_redis_memory_store` - autouse fixture，锁定 Redis 走内存降级路径（测试行为与 Redis 是否可用无关）
 
 ### 使用示例
 
@@ -225,10 +231,29 @@ def test_example(client, auth_headers, test_user, test_video):
 
 ## 注意事项
 
-1. **Redis依赖**：部分测试需要Redis连接。如果Redis不可用，相关测试可能会跳过或失败。
+1. **Redis 已锁定内存路径**：conftest autouse fixture 将三个 get_redis 入口（redis_client/stats/split 模块）patch 为返回 None，短信验证码等走内存降级——**测试行为与 Redis 是否可用完全无关**，无需启动 Redis。
 2. **异步测试**：FastAPI的异步路由会自动处理，无需特殊配置。
 3. **测试隔离**：每个测试函数使用独立的数据库会话，确保测试之间不会相互影响。
-4. **数据清理**：测试后会自动清理数据库，但Redis数据可能需要手动清理。
+4. **数据清理**：db teardown 会 DROP 全部表（失败会显式 fail，杜绝脏表残留）；短信验证码内存 store 每用例后清空。
+5. **celery 已 patch**：split 测试的 `celery_app.send_task` 被 monkeypatch 掉，避免连不可用 Redis 的同步重试（原单用例 19s → 0.9s）。
+
+## 覆盖率分级门禁
+
+总量门禁（`--cov-fail-under=70`）之外，核心业务模块有独立底线（`scripts/check_coverage_gates.py`）：
+
+```bash
+../.venv/bin/python scripts/check_coverage_gates.py   # 返回码非 0 即失败
+```
+
+| 模块 | 底线 |
+|---|---|
+| smart_split/keyframe_extractor.py | 10% |
+| smart_split/video_splitter.py | 15%（API 层实际调用的 ffmpeg 切分器） |
+| smart_split_service.py | 45% |
+| smart_split/knowledge_analyzer.py | 60% |
+| smart_split/speech_to_text.py | 60% |
+
+> 底线为当前实测值向下取整（防止进一步恶化），提升空间见测试设计文档覆盖率 TODO。
 
 ## 编写新测试
 

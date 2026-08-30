@@ -8,8 +8,8 @@
 
 采用微服务架构，提供完整的视频处理、内容推荐、课程管理等功能
 
-[![Tests](https://img.shields.io/badge/tests-304%20passed-brightgreen)]()
-[![Coverage](https://img.shields.io/badge/coverage-76%25-yellow)]()
+[![Tests](https://img.shields.io/badge/tests-315%20passed-brightgreen)]()
+[![Coverage](https://img.shields.io/badge/coverage-75.5%25-yellow)]()
 [![Python](https://img.shields.io/badge/python-3.11%2B-blue)]()
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115%2B-009688)]()
 [![React](https://img.shields.io/badge/React-18.3%2B-61dafb)]()
@@ -156,7 +156,7 @@ my-project/
 │   │   ├── uploads/                # 用户上传文件
 │   │   └── temp/                   # 临时处理文件
 │   ├── docs/                       # 完整的文档中心
-│   ├── tests/                      # 测试套件（304 用例：API 156 + 单元 148）
+│   ├── tests/                      # 测试套件（315 用例：API 165 + 单元 151，43 例参数化）
 │   ├── scripts/                    # 工具脚本
 │   ├── alembic/                    # 数据库迁移
 │   └── docker-compose.yml          # Docker 编排文件
@@ -370,8 +370,8 @@ my-project/
 |------|------|------|
 | ✅ **微服务数量** | 7个服务 + 1个网关 | 高内聚低耦合的架构设计 |
 | ✅ **API接口** | 56 个 | 完整的RESTful API |
-| ✅ **测试通过率** | 304 通过 | 后端全量回归 ~30s（实测） |
-| ✅ **代码覆盖率** | 76% | 核心模块 74%-98%（实测，含 70% 门禁） |
+| ✅ **测试通过率** | 315 通过 | 后端全量回归 ~13s（实测） |
+| ✅ **代码覆盖率** | 75.5% | 核心模块独立底线门禁（实测，含总量 70% + 分级门禁） |
 | ✅ **前端单测** | 10 通过 | Vitest + React Testing Library |
 | ✅ **前端质量门禁** | ESLint 0 error + 构建通过 | 进 CI（`npm run lint` + `npm run build`） |
 | ✅ **E2E 冒烟** | 6 通过 | Playwright 真实后端链路（进 CI） |
@@ -619,12 +619,14 @@ pytest -n auto
 ### 测试统计
 
 ```
-📊 后端测试概览（实测，全量回归 ~30s）:
-├── 总测试用例: 304 全通过
+📊 后端测试概览（实测，全量回归 ~13s）:
+├── 总测试用例: 315 全通过
 ├── 通过率: 100%（2 个历史 xfail 缺陷已修复转正）
-├── 代码覆盖率: 76%（实测，--cov-fail-under=70 门禁）
-├── API测试: 156（含安全/幂等性专项）
-└── 单元测试: 148（推荐算法/AI 降级/工具函数）
+├── 代码覆盖率: 75.5%（实测，总量 70% + 核心模块分级门禁）
+├── 数据驱动: 43 例参数化矩阵
+├── API测试: 165（含安全/幂等性专项）
+├── 单元测试: 151（推荐算法/AI 降级/工具函数）
+
 
 📊 前端测试概览（Vitest + React Testing Library）:
 ├── 登录页行为 4 例（等价类/边界值）
@@ -796,7 +798,7 @@ pytest tests/ -v
 - [x] 消息通知系统
 - [x] 微服务架构实现
 - [x] Docker容器化部署
-- [x] 单元测试和API测试（304 用例，含幂等性/安全专项）
+- [x] 单元测试和API测试（315 用例，含幂等性/安全专项与数据驱动矩阵）
 - [x] 完整文档体系
 
 ### 进行中 🚧
