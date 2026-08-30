@@ -6,7 +6,7 @@ on:
   pull_request:
 
 jobs:
-  # ── 后端测试：304 用例全量回归 + 覆盖率门禁（--cov-fail-under=70）──
+  # ── 后端测试：315 用例全量回归 + 覆盖率门禁（--cov-fail-under=70）──
   test:
     runs-on: ubuntu-latest
     services:
@@ -47,8 +47,12 @@ jobs:
       - name: Install ffmpeg
         run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg
 
-      - name: Run full test suite (304 cases, PostgreSQL integration)
+      - name: Run full test suite (315 cases, PostgreSQL integration)
         run: pytest tests/ -q
+
+      # 覆盖率分级门禁：核心业务模块独立底线（防被总量掩盖）
+      - name: Check per-module coverage gates
+        run: python scripts/check_coverage_gates.py
 
       - name: Upload coverage report
         uses: actions/upload-artifact@v4

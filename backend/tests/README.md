@@ -42,8 +42,7 @@ tests/
 │   ├── test_follow.py    # 关注功能接口
 │   ├── test_idempotency.py  # 幂等性与并发防护（点赞切换/重复关注/分片重传/唯一约束）
 │   └── test_security.py     # 安全与输入校验（SQL注入/认证边界/422边界/404语义）
-└── fixtures/             # 测试数据生成器
-    └── sample_data.py
+└── conftest.py           # 共享 fixtures（test_user/test_video/auth_headers 等）
 ```
 
 ## 运行测试
