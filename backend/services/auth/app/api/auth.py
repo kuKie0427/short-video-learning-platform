@@ -6,7 +6,7 @@ from typing import Optional
 import random
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from pydantic import BaseModel, validator
+from pydantic import BaseModel, ConfigDict, field_validator
 from sqlalchemy.orm import Session
 from jose import JWTError, jwt
 
@@ -37,8 +37,9 @@ security = HTTPBearer()
 
 class PhoneLoginRequest(BaseModel):
     phone: str
-    
-    @validator('phone')
+
+    @field_validator('phone')
+    @classmethod
     def validate_phone(cls, v):
         if not v or len(v) < 10:
             raise ValueError('手机号格式不正确')
@@ -67,8 +68,7 @@ class UserProfile(BaseModel):
     roles: list[str]
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class UpdateProfileRequest(BaseModel):

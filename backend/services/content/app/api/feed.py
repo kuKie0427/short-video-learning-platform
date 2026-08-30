@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 from sqlalchemy import desc, func, or_, and_
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 import math
 
 import sys
@@ -95,8 +95,7 @@ class VideoFeedResponse(BaseModel):
     is_favorited: bool = False
     created_at: datetime
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class FeedResponse(BaseModel):
@@ -204,7 +203,7 @@ async def get_my_videos(
 async def get_recommend_feed(
     page: int = Query(1, ge=1, description="页码"),
     page_size: int = Query(20, ge=1, le=50, description="每页数量"),
-    strategy: str = Query("hybrid", regex="^(hybrid|content|collaborative|popularity)$", description="推荐策略"),
+    strategy: str = Query("hybrid", pattern="^(hybrid|content|collaborative|popularity)$", description="推荐策略"),
     current_user: Optional[User] = Depends(get_optional_user),  # 开发环境：可选认证
     db: Session = Depends(get_db)
 ):
@@ -736,7 +735,7 @@ async def get_hot_feed(
 @router.get("/search", summary="搜索视频")
 async def search_videos(
     q: str = Query(..., min_length=1, max_length=100, description="搜索关键词"),
-    search_type: str = Query("all", regex="^(all|title|tag|author)$", description="搜索类型"),
+    search_type: str = Query("all", pattern="^(all|title|tag|author)$", description="搜索类型"),
     page: int = Query(1, ge=1, description="页码"),
     page_size: int = Query(20, ge=1, le=50, description="每页数量"),
     current_user: Optional[User] = Depends(get_optional_user),

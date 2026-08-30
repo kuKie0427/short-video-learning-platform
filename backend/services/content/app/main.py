@@ -11,6 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
 from sqlalchemy.exc import SQLAlchemyError
+from contextlib import asynccontextmanager
 
 # 添加项目根目录到路径
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../..'))
@@ -51,12 +52,22 @@ except Exception as e:
         logger.warning(f"开发环境Redis连接失败: {e}")
 
 # 创建FastAPI应用
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """应用生命周期：启动时记录服务信息"""
+    logger.info("✅ Content服务已启动")
+    logger.info(f"   - 环境: {settings.ENVIRONMENT}")
+    logger.info("   - 服务地址: http://localhost:8002")
+    yield
+
+
 app = FastAPI(
     title="Content服务 - 内容管理",
     version="1.0.0",
     description="短视频学习平台内容管理、推荐、互动服务",
     docs_url="/docs",
-    redoc_url="/redoc"
+    redoc_url="/redoc",
+    lifespan=lifespan
 )
 
 # 配置CORS
@@ -117,14 +128,6 @@ app.include_router(feed_router)
 app.include_router(interaction_router)
 app.include_router(follow_router)
 app.include_router(learn_router)
-
-
-@app.on_event("startup")
-async def startup_event():
-    """应用启动时执行"""
-    logger.info("✅ Content服务已启动")
-    logger.info(f"   - 环境: {settings.ENVIRONMENT}")
-    logger.info("   - 服务地址: http://localhost:8002")
 
 
 @app.get("/")

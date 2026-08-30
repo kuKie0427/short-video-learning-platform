@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.security import HTTPBearer
 from sqlalchemy.orm import Session
 from sqlalchemy import insert
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 from common.database.connection import get_db
 from common.models import User, SplitTask, SplitSegment, Video, LongVideo
@@ -48,11 +48,7 @@ class SplitTaskResponse(BaseModel):
     updated_at: Optional[datetime]  # 设为可选，避免验证失败
     completed_at: Optional[datetime]
 
-    class Config:
-        from_attributes = True
-        json_encoders = {
-            uuid.UUID: str
-        }
+    model_config = ConfigDict(from_attributes=True, json_encoders={uuid.UUID: str})
 
     @classmethod
     def from_orm(cls, obj):
@@ -86,11 +82,7 @@ class SplitSegmentResponse(BaseModel):
     video_id: Optional[str]
     created_at: datetime
 
-    class Config:
-        from_attributes = True
-        json_encoders = {
-            uuid.UUID: str
-        }
+    model_config = ConfigDict(from_attributes=True, json_encoders={uuid.UUID: str})
 
     @classmethod
     def from_orm(cls, obj):

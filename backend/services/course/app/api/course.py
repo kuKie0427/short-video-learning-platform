@@ -7,7 +7,7 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import desc, func, and_, or_
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 from common.database.connection import get_db
 from common.models import User, Course, CourseVideo, Video, Like, Favorite, LearnRecord
@@ -64,8 +64,7 @@ class CourseResponse(BaseModel):
     created_at: datetime
     updated_at: Optional[datetime]
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class CourseListItem(BaseModel):
@@ -79,8 +78,7 @@ class CourseListItem(BaseModel):
     status: str
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 @router.post("", summary="创建课程")

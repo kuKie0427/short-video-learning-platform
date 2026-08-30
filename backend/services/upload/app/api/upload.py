@@ -6,6 +6,7 @@ import os
 import tempfile
 import logging
 import base64
+import binascii
 from io import BytesIO
 from datetime import datetime, timedelta
 from typing import Optional, Dict, Any
@@ -344,6 +345,10 @@ async def upload_image(
             data={"url": image_url},
             message="图片上传成功"
         )
+    except (binascii.Error, ValueError) as e:
+        # 无效 Base64 是客户端输入错误 → 422（而非 500 服务器错误）
+        logger.warning(f"无效的 Base64 图片数据: {e}")
+        return error_response("无效的图片数据（Base64 解码失败）", code=422)
     except Exception as e:
         logger.error(f"图片上传失败: {e}", exc_info=True)
         return error_response(f"图片上传失败: {str(e)}", code=500)

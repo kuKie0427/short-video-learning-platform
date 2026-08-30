@@ -5,7 +5,7 @@
 import os
 from typing import List, Optional
 from pydantic_settings import BaseSettings
-from pydantic import Field, validator, ConfigDict
+from pydantic import Field, ConfigDict, field_validator
 
 
 def get_env_file_path() -> Optional[str]:
@@ -57,19 +57,21 @@ class Settings(BaseSettings):
     # GLM AI 配置（未设置时 AI 知识点分析自动走降级切分，不再内置默认密钥）
     GLM_API_KEY: Optional[str] = Field(default=None, description="GLM API密钥（通过环境变量 GLM_API_KEY 配置）")
     
-    @validator("JWT_SECRET_KEY", always=True)
-    def validate_jwt_secret_key(cls, v, values):
+    @field_validator("JWT_SECRET_KEY")
+    @classmethod
+    def validate_jwt_secret_key(cls, v, info):
         """生产环境必须设置JWT密钥"""
-        jwt_secret = v or values.get("JWT_SECRET")
-        environment = values.get("ENVIRONMENT", "development")
+        jwt_secret = v or info.data.get("JWT_SECRET")
+        environment = info.data.get("ENVIRONMENT", "development")
         if environment == "production" and (not jwt_secret or jwt_secret == "your-secret-key-change-in-production"):
             raise ValueError("生产环境必须设置JWT_SECRET_KEY或JWT_SECRET环境变量")
         return jwt_secret or "your-secret-key-change-in-production"
-    
-    @validator("CORS_ORIGINS")
-    def validate_cors_origins(cls, v, values):
+
+    @field_validator("CORS_ORIGINS")
+    @classmethod
+    def validate_cors_origins(cls, v, info):
         """生产环境禁止使用*"""
-        environment = values.get("ENVIRONMENT", "development")
+        environment = info.data.get("ENVIRONMENT", "development")
         if environment == "production" and v == "*":
             raise ValueError("生产环境禁止使用CORS_ORIGINS=*，必须明确指定允许的来源")
         return v

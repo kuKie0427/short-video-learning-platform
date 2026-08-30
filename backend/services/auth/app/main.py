@@ -10,6 +10,7 @@ from fastapi import FastAPI, Request, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
+from contextlib import asynccontextmanager
 from sqlalchemy.exc import SQLAlchemyError
 
 # 添加项目根目录到路径
@@ -69,12 +70,23 @@ except Exception as e:
         logger.warning(f"开发环境Redis连接失败（将使用内存存储）: {e}")
 
 # 创建FastAPI应用
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """应用生命周期：启动时校验配置并记录服务信息"""
+    validate_startup_config()
+    logger.info("✅ Auth服务已启动")
+    logger.info(f"   - 环境: {settings.ENVIRONMENT}")
+    logger.info("   - 服务地址: http://localhost:8001")
+    yield
+
+
 app = FastAPI(
     title="Auth服务 - 认证授权",
     version="1.0.0",
     description="短视频学习平台认证授权服务",
     docs_url="/docs",
-    redoc_url="/redoc"
+    redoc_url="/redoc",
+    lifespan=lifespan
 )
 
 # 配置CORS
@@ -141,15 +153,6 @@ async def general_exception_handler(request: Request, exc: Exception):
 
 # 注册API路由
 app.include_router(auth_router)
-
-
-@app.on_event("startup")
-async def startup_event():
-    """应用启动时执行"""
-    validate_startup_config()
-    logger.info("✅ Auth服务已启动")
-    logger.info(f"   - 环境: {settings.ENVIRONMENT}")
-    logger.info("   - 服务地址: http://localhost:8001")
 
 
 @app.get("/")

@@ -132,8 +132,22 @@ async def search_videos(
     if sort_by == "latest":
         query = query.order_by(desc(Video.created_at))
     elif sort_by == "hot":
-        # 按创建时间排序（实际应该按热度分数排序，但需要在应用层计算）
-        query = query.order_by(desc(Video.created_at))
+        # 按热度排序：互动总量（点赞+收藏+评论）降序，同分按时间
+        # 原缺陷：hot 与 latest 同序（伪实现）；改用聚合计数作为热度代理
+        from sqlalchemy import func
+        from common.models import Like, Favorite, Comment
+        hot_count = (
+            func.count(func.distinct(Like.id)) +
+            func.count(func.distinct(Favorite.id)) +
+            func.count(func.distinct(Comment.id))
+        ).label("hot_score")
+        query = (
+            query.outerjoin(Like, Video.id == Like.video_id)
+            .outerjoin(Favorite, Video.id == Favorite.video_id)
+            .outerjoin(Comment, Video.id == Comment.video_id)
+            .group_by(Video.id)
+            .order_by(desc(hot_count), desc(Video.created_at))
+        )
     elif sort_by == "relevance":
         # 按创建时间排序（实际应该按相关性排序）
         query = query.order_by(desc(Video.created_at))
