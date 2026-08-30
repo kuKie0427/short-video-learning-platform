@@ -45,7 +45,7 @@ class TestMarkRead:
     """测试标记消息已读"""
     
     def test_mark_read_success(self, notification_client, auth_headers, db, test_user):
-        """测试成功标记已读"""
+        """测试成功标记已读（断言数据库最终态：is_read 确实翻转）"""
         # 创建一条消息
         from common.models import Notification
         notification = Notification(
@@ -67,6 +67,10 @@ class TestMarkRead:
         assert response.status_code == 200
         data = response.json()
         assert data["code"] == 200
+        assert data["data"]["updated_count"] == 1
+        # 数据库最终态：is_read 已翻转
+        db.refresh(notification)
+        assert notification.is_read is True
     
     def test_mark_read_unauthorized(self, notification_client):
         """测试未授权标记已读"""

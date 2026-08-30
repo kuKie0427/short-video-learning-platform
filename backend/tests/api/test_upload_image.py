@@ -1,7 +1,7 @@
 """
 上传服务补充测试
 
-- upload_image：base64 图片上传（带/不带 data: 前缀、无效数据 500）
+- upload_image：base64 图片上传（带/不带 data: 前缀、无效数据 422）
 - upload_chunk：参数校验分支（缺 upload_id / 缺 chunk_index / 非整数索引 → 400）
 """
 import base64
@@ -57,7 +57,11 @@ class TestUploadImage:
     def test_upload_image_invalid_base64(
         self, upload_client, auth_headers, db, test_user, tmp_path, monkeypatch
     ):
-        """无效 base64 → 500 不崩溃"""
+        """无效 base64 → 422（客户端输入错误，而非 500 服务器错误）
+
+        历史缺陷：binascii.Error 未被捕获，落入通用 except → 500；
+        已修复为 binascii.Error 单独捕获返回 422。
+        """
         from services.upload.app.api import upload as upload_api
 
         storage = LocalStorageService(base_dir=str(tmp_path / "uploads"))
@@ -69,8 +73,8 @@ class TestUploadImage:
             json={"image": "!!!not-base64!!!"}
         )
 
-        assert response.status_code == 500
-        assert response.json()["code"] == 500
+        assert response.status_code == 422
+        assert response.json()["code"] == 422
 
 
 @pytest.mark.api

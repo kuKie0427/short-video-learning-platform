@@ -5,24 +5,40 @@ import pytest
 import uuid
 
 
+def _make_long_video(db, video, url="/path/to/video.mp4"):
+    """为已存在的 Video 创建 LongVideo 记录（消除 7 处重复构造样板）"""
+    from common.models import LongVideo
+    long_video = LongVideo(
+        id=str(uuid.uuid4()),
+        video_id=video.id,
+        original_duration=3600,
+        original_file_url=url,
+        split_enabled=True
+    )
+    db.add(long_video)
+    db.commit()
+    return long_video
+
+
 @pytest.mark.api
 class TestCreateSplitTask:
     """测试创建拆分任务"""
     
-    def test_create_split_task_success(self, split_client, auth_headers, db, test_user, test_video):
-        """测试成功创建拆分任务"""
-        # 先创建长视频（LongVideo需要关联一个Video）
-        from common.models import LongVideo
-        long_video = LongVideo(
-            id=str(uuid.uuid4()),
-            video_id=test_video.id,
-            original_duration=3600,
-            original_file_url="/path/to/video.mp4",
-            split_enabled=True
-        )
-        db.add(long_video)
-        db.commit()
-        
+    def test_create_split_task_success(self, split_client, auth_headers, db, test_user, test_video, monkeypatch):
+        """测试成功创建拆分任务
+
+        注：patch 掉 celery send_task——测试环境无 Redis broker，真实 send_task 会同步
+        重试阻塞约 19s（回归速度黑洞）；任务入队本身不是本用例的断言对象，
+        断言对象是"任务创建 + 状态落库为 queued"。
+        """
+        from common.models import LongVideo, SplitTask
+        # patch celery send_task：不真发消息，记录调用即可
+        from services.split.app.api.split import celery_app
+        sent = []
+        monkeypatch.setattr(celery_app, "send_task", lambda *a, **kw: sent.append((a, kw)) or None)
+
+        long_video = _make_long_video(db, test_video, "/path/to/video.mp4")
+
         response = split_client.post(
             "/api/split/tasks",
             headers=auth_headers,
@@ -32,11 +48,17 @@ class TestCreateSplitTask:
                 "organization_mode": "course"
             }
         )
-        
+
         assert response.status_code == 200
         data = response.json()
         assert data["code"] == 200
         assert "data" in data
+        # 任务确已入队且状态落库为 queued（数据库最终态断言）
+        assert len(sent) == 1
+        task_id = data["data"]["id"]
+        task = db.query(SplitTask).filter(SplitTask.id == task_id).first()
+        assert task is not None
+        assert task.status == "queued"
     
     def test_create_split_task_nonexistent_video(self, split_client, auth_headers):
         """测试不存在的长视频"""
@@ -96,15 +118,7 @@ class TestGetSplitTasks:
         修复：任务序列化时经 task.long_video 关联取 video_id。
         """
         from common.models import LongVideo, SplitTask
-        long_video = LongVideo(
-            id=str(uuid.uuid4()),
-            video_id=test_video.id,
-            original_duration=3600,
-            original_file_url="/path/to/video.mp4",
-            split_enabled=True
-        )
-        db.add(long_video)
-        db.commit()
+        long_video = _make_long_video(db, test_video, "/path/to/video.mp4")
 
         task = SplitTask(
             id=str(uuid.uuid4()),
@@ -130,15 +144,7 @@ class TestGetSplitTasks:
     def test_get_split_tasks_user_isolation(self, split_client, auth_headers, auth_headers_user2, db, test_user, test_user2, test_video):
         """权限隔离：其他用户的任务不出现在我的列表"""
         from common.models import LongVideo, SplitTask
-        long_video = LongVideo(
-            id=str(uuid.uuid4()),
-            video_id=test_video.id,
-            original_duration=3600,
-            original_file_url="/path/to/video.mp4",
-            split_enabled=True
-        )
-        db.add(long_video)
-        db.commit()
+        long_video = _make_long_video(db, test_video, "/path/to/video.mp4")
 
         other_task = SplitTask(
             id=str(uuid.uuid4()),
@@ -168,14 +174,7 @@ class TestGetSplitTask:
         """测试成功获取任务详情"""
         # 创建拆分任务
         from common.models import SplitTask, LongVideo
-        long_video = LongVideo(
-            id=str(uuid.uuid4()),
-            video_id=test_video.id,
-            original_duration=3600,
-            original_file_url="/path/to/video2.mp4",
-            split_enabled=True
-        )
-        db.add(long_video)
+        long_video = _make_long_video(db, test_video, "/path/to/video2.mp4")
         
         split_task = SplitTask(
             task_id=str(uuid.uuid4()),
@@ -218,14 +217,7 @@ class TestGetSegments:
         """测试成功获取拆分预览"""
         # 创建拆分任务和分段
         from common.models import SplitTask, SplitSegment, LongVideo
-        long_video = LongVideo(
-            id=str(uuid.uuid4()),
-            video_id=test_video.id,
-            original_duration=3600,
-            original_file_url="/path/to/video3.mp4",
-            split_enabled=True
-        )
-        db.add(long_video)
+        long_video = _make_long_video(db, test_video, "/path/to/video3.mp4")
         
         split_task = SplitTask(
             task_id=str(uuid.uuid4()),
@@ -269,14 +261,7 @@ class TestUpdateSegments:
         """测试成功更新拆分点"""
         # 创建拆分任务和分段
         from common.models import SplitTask, SplitSegment, LongVideo
-        long_video = LongVideo(
-            id=str(uuid.uuid4()),
-            video_id=test_video.id,
-            original_duration=3600,
-            original_file_url="/path/to/video4.mp4",
-            split_enabled=True
-        )
-        db.add(long_video)
+        long_video = _make_long_video(db, test_video, "/path/to/video4.mp4")
         
         split_task = SplitTask(
             task_id=str(uuid.uuid4()),
@@ -326,14 +311,7 @@ class TestCancelSplitTask:
         """测试成功取消任务"""
         # 创建拆分任务
         from common.models import SplitTask, LongVideo
-        long_video = LongVideo(
-            id=str(uuid.uuid4()),
-            video_id=test_video.id,
-            original_duration=3600,
-            original_file_url="/path/to/video5.mp4",
-            split_enabled=True
-        )
-        db.add(long_video)
+        long_video = _make_long_video(db, test_video, "/path/to/video5.mp4")
         
         split_task = SplitTask(
             task_id=str(uuid.uuid4()),

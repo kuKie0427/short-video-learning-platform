@@ -14,6 +14,34 @@ import pytest
 from common.models import Video
 
 
+def _forge_token() -> str:
+    """攻击者用错误密钥自签 JWT → 验签失败 401（供认证矩阵参数表惰性构造）"""
+    from datetime import datetime, timedelta, timezone
+    from jose import jwt
+    from common.config.settings import settings
+
+    return jwt.encode(
+        {"sub": "00000000-0000-0000-0000-000000000000",
+         "exp": datetime.now(timezone.utc) + timedelta(minutes=30)},
+        "attacker-controlled-secret",
+        algorithm=settings.JWT_ALGORITHM
+    )
+
+
+def _expired_token() -> str:
+    """正确密钥签名但 exp 已过期的 JWT（供认证矩阵参数表惰性构造）"""
+    from datetime import datetime, timedelta, timezone
+    from jose import jwt
+    from common.config.settings import settings
+
+    return jwt.encode(
+        {"sub": "00000000-0000-0000-0000-000000000000",
+         "exp": datetime.now(timezone.utc) - timedelta(minutes=1)},
+        settings.JWT_SECRET_KEY,
+        algorithm=settings.JWT_ALGORITHM
+    )
+
+
 def _make_video(db, author, title) -> Video:
     video = Video(
         id=str(uuid.uuid4()),
@@ -87,72 +115,71 @@ class TestAuthBoundary:
     状态码语义（common/utils/auth.py）：
     - 无 Authorization 头 → 403（FastAPI HTTPBearer 默认行为）
     - 凭证非法/过期/伪造 → 401（verify_token 验签失败）
+
+    数据驱动：同接口 × 多组凭证 → 预期状态码矩阵。
+    headers 为 callable（惰性构造，fixture 依赖在函数内解析）。
     """
 
     LIKE_URL = "/api/interaction/like"
 
-    def test_write_without_token_returns_403(self, client, test_video):
-        response = client.post(self.LIKE_URL, json={"video_id": str(test_video.id)})
-        assert response.status_code == 403
+    # (headers构造器, 预期状态码, 用例id)
+    TOKEN_CASES = [
+        pytest.param(None, 403, id="no-token"),
+        pytest.param(lambda: {"Authorization": "Bearer malformed-token"}, 401, id="malformed-token"),
+        pytest.param(lambda: {"Authorization": f"Bearer {_expired_token()}"}, 401, id="expired-token"),
+        pytest.param(lambda: {"Authorization": f"Bearer {_forge_token()}"}, 401, id="forged-signature"),
+    ]
 
-    def test_write_with_malformed_token_returns_401(self, client, test_video):
+    @pytest.mark.parametrize("headers_builder, expected_status", TOKEN_CASES)
+    def test_write_with_invalid_credentials(self, client, test_video, headers_builder, expected_status):
+        """认证边界矩阵：无凭证 403，非法/过期/伪造凭证一律 401"""
+        headers = headers_builder() if headers_builder else None
         response = client.post(
             self.LIKE_URL,
             json={"video_id": str(test_video.id)},
-            headers={"Authorization": "Bearer malformed-token"}
+            headers=headers,
         )
-        assert response.status_code == 401
-
-    def test_write_with_expired_token_returns_401(self, client, expired_auth_headers, test_video):
-        response = client.post(
-            self.LIKE_URL,
-            json={"video_id": str(test_video.id)},
-            headers=expired_auth_headers
-        )
-        assert response.status_code == 401
-
-    def test_write_with_forged_signature_returns_401(self, client, test_user, test_video):
-        """攻击者用错误密钥自签 JWT → 验签失败 401"""
-        from datetime import datetime, timedelta, timezone
-        from jose import jwt
-        from common.config.settings import settings
-
-        forged = jwt.encode(
-            {"sub": str(test_user.id), "exp": datetime.now(timezone.utc) + timedelta(minutes=30)},
-            "attacker-controlled-secret",
-            algorithm=settings.JWT_ALGORITHM
-        )
-        response = client.post(
-            self.LIKE_URL,
-            json={"video_id": str(test_video.id)},
-            headers={"Authorization": f"Bearer {forged}"}
-        )
-        assert response.status_code == 401
+        assert response.status_code == expected_status
 
 
 @pytest.mark.api
 class TestInputValidation:
-    """输入边界校验（框架层防线，全部应为确定性的 422）"""
+    """输入边界校验（框架层防线，全部应为确定性的 422）
 
-    def test_search_query_exceeds_max_length(self, client):
-        """关键词超过 100 字符上限 → 422"""
-        response = client.get(f"/api/feed/search?q={'a' * 101}")
+    数据驱动：查询参数越界矩阵（空 / 超长 / 越界），全部预期 422；
+    恰好边界值能通过的用例单独成组（见 TestBoundaryAccepted）。
+    """
+
+    # 越界/非法输入 → 422
+    REJECTED_CASES = [
+        pytest.param("/api/feed/search?q=", id="search-empty-query"),
+        pytest.param("/api/feed/search?q=" + "a" * 101, id="search-over-max-length"),
+        pytest.param("/api/feed/hot?page=0", id="hot-page-zero"),
+        pytest.param("/api/feed/hot?page_size=51", id="hot-page-size-over-limit"),
+    ]
+
+    @pytest.mark.parametrize("url", REJECTED_CASES)
+    def test_query_out_of_bound_rejected(self, client, url):
+        """越界/非法查询参数 → 确定性 422"""
+        response = client.get(url)
         assert response.status_code == 422
 
-    def test_search_query_at_max_length_accepted(self, client):
-        """边界值：恰好 100 字符 → 通过校验"""
-        response = client.get(f"/api/feed/search?q={'a' * 100}")
+
+@pytest.mark.api
+class TestBoundaryAccepted:
+    """边界值恰好合法 → 通过校验（200），与越界矩阵成对验证边界语义"""
+
+    ACCEPTED_CASES = [
+        pytest.param("/api/feed/search?q=" + "a" * 100, id="search-at-max-length"),
+        pytest.param("/api/feed/hot?page=1", id="hot-page-min"),
+        pytest.param("/api/feed/hot?page_size=50", id="hot-page-size-at-limit"),
+    ]
+
+    @pytest.mark.parametrize("url", ACCEPTED_CASES)
+    def test_boundary_value_accepted(self, client, url):
+        """恰好处于边界值 → 200 而非 422"""
+        response = client.get(url)
         assert response.status_code == 200
-
-    def test_feed_page_size_exceeds_limit(self, client):
-        """page_size 超过 50 上限 → 422"""
-        response = client.get("/api/feed/hot?page_size=51")
-        assert response.status_code == 422
-
-    def test_feed_page_zero_rejected(self, client):
-        """page=0 违反 ge=1 → 422"""
-        response = client.get("/api/feed/hot?page=0")
-        assert response.status_code == 422
 
 
 @pytest.mark.api

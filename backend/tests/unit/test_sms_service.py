@@ -28,28 +28,70 @@ class TestMockSMSService:
 
 @pytest.mark.unit
 class TestGetSmsServiceFactory:
-    """工厂函数"""
+    """工厂函数（数据驱动：provider × 配置完整性矩阵）
 
-    def test_default_is_mock(self, monkeypatch):
-        monkeypatch.delenv("SMS_PROVIDER", raising=False)
-        assert isinstance(get_sms_service(), MockSMSService)
+    分支（sms_service.get_sms_service）：
+    - 未配置 provider → Mock
+    - provider 已配置但密钥缺失 → 降级 Mock
+    - provider 已配置且密钥完整，但 SDK 未安装 → 构造真实服务时抛 ImportError
+    （SDK 存在时的完整实例化见 test_complete_config_with_sdk_instantiates_real_service）
+    """
 
-    def test_aliyun_incomplete_config_falls_back_to_mock(self, monkeypatch):
+    # (provider, 配置完整, 期望结果类型或异常, 用例id)
+    FACTORY_CASES = [
+        pytest.param(None, False, MockSMSService, id="default-mock"),
+        pytest.param("aliyun", False, MockSMSService, id="aliyun-incomplete-config"),
+        pytest.param("tencent", False, MockSMSService, id="tencent-incomplete-config"),
+        pytest.param("aliyun", True, ImportError, id="aliyun-complete-no-sdk"),
+        pytest.param("tencent", True, ImportError, id="tencent-complete-no-sdk"),
+    ]
+
+    # 完整配置分支所需的全部环境变量（sms_service.py:158-192 逐一校验）
+    _ALIYUN_KEYS = ("ALIYUN_ACCESS_KEY_ID", "ALIYUN_ACCESS_KEY_SECRET", "ALIYUN_SMS_TEMPLATE_CODE")
+    _TENCENT_KEYS = ("TENCENT_SECRET_ID", "TENCENT_SECRET_KEY", "TENCENT_SMS_APP_ID", "TENCENT_SMS_TEMPLATE_ID")
+
+    @pytest.mark.parametrize("provider, complete, expected", FACTORY_CASES)
+    def test_factory_branch_matrix(self, monkeypatch, provider, complete, expected):
+        """provider 分支矩阵：未配置/密钥缺失 → Mock；密钥完整但 SDK 缺失 → ImportError"""
+        if provider:
+            monkeypatch.setenv("SMS_PROVIDER", provider)
+        else:
+            monkeypatch.delenv("SMS_PROVIDER", raising=False)
+        keys = self._ALIYUN_KEYS if provider == "aliyun" else self._TENCENT_KEYS
+        for key in keys:
+            if complete:
+                monkeypatch.setenv(key, "test-value")
+            else:
+                monkeypatch.delenv(key, raising=False)
+        if expected is ImportError:
+            with pytest.raises(ImportError):
+                get_sms_service()
+        else:
+            assert isinstance(get_sms_service(), expected)
+
+    def test_complete_config_with_sdk_instantiates_real_service(self, monkeypatch):
+        """完整配置 + SDK 已安装 → 实例化真实服务（注入 fake SDK 验证工厂接线）"""
         monkeypatch.setenv("SMS_PROVIDER", "aliyun")
-        monkeypatch.delenv("ALIYUN_ACCESS_KEY_ID", raising=False)
-        assert isinstance(get_sms_service(), MockSMSService)
+        for key in self._ALIYUN_KEYS:
+            monkeypatch.setenv(key, "test-value")
+        # 注入 fake SDK（monkeypatch.setitem 自动还原，避免 sys.modules 残留）
+        fake_client_mod = types.ModuleType("aliyunsdkcore.client")
+        fake_client_mod.AcsClient = mock.MagicMock
+        fake_req_mod = types.ModuleType("aliyunsdkcore.request")
+        fake_req_mod.CommonRequest = mock.MagicMock
+        monkeypatch.setitem(sys.modules, "aliyunsdkcore", types.ModuleType("aliyunsdkcore"))
+        monkeypatch.setitem(sys.modules, "aliyunsdkcore.client", fake_client_mod)
+        monkeypatch.setitem(sys.modules, "aliyunsdkcore.request", fake_req_mod)
 
-    def test_tencent_incomplete_config_falls_back_to_mock(self, monkeypatch):
-        monkeypatch.setenv("SMS_PROVIDER", "tencent")
-        monkeypatch.delenv("TENCENT_SECRET_ID", raising=False)
-        assert isinstance(get_sms_service(), MockSMSService)
+        service = get_sms_service()
+        assert isinstance(service, AliyunSMSService)
 
 
 @pytest.mark.unit
 class TestAliyunSMSService:
-    """阿里云短信（注入假 SDK）"""
+    """阿里云短信（注入假 SDK，monkeypatch.setitem 自动还原）"""
 
-    def _install_fake_sdk(self, response=None, exc=None):
+    def _install_fake_sdk(self, monkeypatch, response=None, exc=None):
         class FakeAcsClient:
             def __init__(self, *a, **kw):
                 pass
@@ -63,32 +105,29 @@ class TestAliyunSMSService:
         fake_client_mod.AcsClient = FakeAcsClient
         fake_req_mod = types.ModuleType("aliyunsdkcore.request")
         fake_req_mod.CommonRequest = mock.MagicMock
-        sys.modules["aliyunsdkcore"] = types.ModuleType("aliyunsdkcore")
-        sys.modules["aliyunsdkcore.client"] = fake_client_mod
-        sys.modules["aliyunsdkcore.request"] = fake_req_mod
+        monkeypatch.setitem(sys.modules, "aliyunsdkcore", types.ModuleType("aliyunsdkcore"))
+        monkeypatch.setitem(sys.modules, "aliyunsdkcore.client", fake_client_mod)
+        monkeypatch.setitem(sys.modules, "aliyunsdkcore.request", fake_req_mod)
 
-    @pytest.fixture(autouse=True)
-    def _cleanup(self):
-        yield
-        for m in ["aliyunsdkcore", "aliyunsdkcore.client", "aliyunsdkcore.request"]:
-            sys.modules.pop(m, None)
+    # (SDK响应, 是否抛异常, 预期结果, 用例id)
+    SEND_CASES = [
+        pytest.param(b"{}", None, True, id="send-success"),
+        pytest.param(None, RuntimeError("sms api down"), False, id="send-exception"),
+    ]
 
-    def test_send_success(self):
-        self._install_fake_sdk(response=b"{}")
+    @pytest.mark.parametrize("response, exc, expected", SEND_CASES)
+    def test_send_matrix(self, monkeypatch, response, exc, expected):
+        """阿里云发送矩阵：SDK 正常返回 → True，抛异常 → False"""
+        self._install_fake_sdk(monkeypatch, response=response, exc=exc)
         service = AliyunSMSService("key", "secret", "签名", "SMS_001")
-        assert service.send_sms("13900000000", "123456") is True
-
-    def test_send_exception_returns_false(self):
-        self._install_fake_sdk(exc=RuntimeError("sms api down"))
-        service = AliyunSMSService("key", "secret", "签名", "SMS_001")
-        assert service.send_sms("13900000000", "123456") is False
+        assert service.send_sms("13900000000", "123456") is expected
 
 
 @pytest.mark.unit
 class TestTencentSMSService:
-    """腾讯云短信（注入假 SDK）"""
+    """腾讯云短信（注入假 SDK，monkeypatch.setitem 自动还原）"""
 
-    def _install_fake_sdk(self, code="Ok"):
+    def _install_fake_sdk(self, monkeypatch, code="Ok"):
         class FakeResp:
             SendStatusSet = [mock.MagicMock(Code=code, Message="ok")]
 
@@ -128,21 +167,17 @@ class TestTencentSMSService:
             "tencentcloud.sms.v20210111.sms_client": fake_sms.sms_client,
             "tencentcloud.sms.v20210111.models": fake_sms.models,
         }.items():
-            sys.modules[name] = mod
+            monkeypatch.setitem(sys.modules, name, mod)
 
-    @pytest.fixture(autouse=True)
-    def _cleanup(self):
-        yield
-        for m in list(sys.modules):
-            if m.startswith("tencentcloud"):
-                sys.modules.pop(m, None)
+    # (SDK返回码, 预期结果, 用例id)
+    SEND_CASES = [
+        pytest.param("Ok", True, id="send-success"),
+        pytest.param("LimitExceeded", False, id="send-limit-exceeded"),
+    ]
 
-    def test_send_success_when_status_ok(self):
-        self._install_fake_sdk(code="Ok")
+    @pytest.mark.parametrize("code, expected", SEND_CASES)
+    def test_send_matrix(self, monkeypatch, code, expected):
+        """腾讯云发送矩阵：返回码 Ok → True，业务失败码 → False"""
+        self._install_fake_sdk(monkeypatch, code=code)
         service = TencentSMSService("sid", "skey", "app1", "签名", "tmpl")
-        assert service.send_sms("13900000000", "123456") is True
-
-    def test_send_failure_when_status_not_ok(self):
-        self._install_fake_sdk(code="LimitExceeded")
-        service = TencentSMSService("sid", "skey", "app1", "签名", "tmpl")
-        assert service.send_sms("13900000000", "123456") is False
+        assert service.send_sms("13900000000", "123456") is expected

@@ -18,17 +18,17 @@ class TestSuccessResponse:
     
     def test_success_response_with_data(self):
         """测试带数据的成功响应"""
+        import json as _json
         data = {"id": "123", "name": "test"}
         response = success_response(data=data)
         
         assert isinstance(response, JSONResponse)
         assert response.status_code == 200
         
-        content = response.body.decode()
-        assert "code" in content
-        assert "200" in content
+        content = _json.loads(response.body.decode())
+        assert content["code"] == 200
         assert "message" in content
-        assert "data" in content
+        assert content["data"] == data
     
     def test_success_response_without_data(self):
         """测试不带数据的成功响应"""

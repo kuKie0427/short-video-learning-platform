@@ -12,7 +12,21 @@ from common.models import Follow, Like, Video
 
 @pytest.mark.api
 class TestRecommendFeed:
-    """测试首页推荐接口"""
+    """测试首页推荐接口（数据驱动：分页/策略参数矩阵）"""
+
+    # 非法查询参数 → 422（feed.py:205 Query ge/regex 校验）
+    INVALID_QUERY_CASES = [
+        pytest.param("/api/feed/recommend?page=0", id="page-zero"),
+        pytest.param("/api/feed/recommend?page_size=0", id="page-size-zero"),
+        pytest.param("/api/feed/recommend?page_size=51", id="page-size-over-limit"),
+        pytest.param("/api/feed/recommend?strategy=bogus", id="invalid-strategy"),
+    ]
+
+    @pytest.mark.parametrize("url", INVALID_QUERY_CASES)
+    def test_recommend_invalid_query_returns_422(self, client, auth_headers, url):
+        """分页/策略参数越界矩阵 → 确定性 422"""
+        response = client.get(url, headers=auth_headers)
+        assert response.status_code == 422
 
     def test_recommend_feed_success(self, client, auth_headers, test_video):
         """已登录获取推荐流：返回已发布视频及互动字段"""
@@ -53,16 +67,6 @@ class TestRecommendFeed:
         data = response.json()
         assert data["code"] == 200
         assert isinstance(data["data"]["videos"], list)
-
-    def test_recommend_feed_invalid_page_returns_422(self, client, auth_headers):
-        """page=0 违反 ge=1 约束 → 422"""
-        response = client.get("/api/feed/recommend?page=0", headers=auth_headers)
-        assert response.status_code == 422
-
-    def test_recommend_feed_invalid_strategy_returns_422(self, client, auth_headers):
-        """非法推荐策略（正则白名单之外）→ 422"""
-        response = client.get("/api/feed/recommend?strategy=bogus", headers=auth_headers)
-        assert response.status_code == 422
 
 
 @pytest.mark.api
@@ -156,7 +160,19 @@ class TestHotFeed:
 
 @pytest.mark.api
 class TestSearchFeed:
-    """测试视频搜索接口"""
+    """测试视频搜索接口（数据驱动：搜索参数矩阵）"""
+
+    # 非法搜索参数 → 422（feed.py:737 Query min_length/regex 校验）
+    INVALID_QUERY_CASES = [
+        pytest.param("/api/feed/search?q=", id="empty-query"),
+        pytest.param("/api/feed/search?q=test&search_type=bogus", id="invalid-search-type"),
+    ]
+
+    @pytest.mark.parametrize("url", INVALID_QUERY_CASES)
+    def test_search_invalid_query_returns_422(self, client, url):
+        """空关键词 / 非法搜索类型 → 422"""
+        response = client.get(url)
+        assert response.status_code == 422
 
     def test_search_feed_matches_title(self, client, test_user, db):
         """搜索命中标题：只返回匹配的视频，并报告准确的总数"""
@@ -187,18 +203,6 @@ class TestSearchFeed:
         data = response.json()["data"]
         assert data["total"] == 1
         assert data["videos"][0]["id"] == str(target.id)
-
-    def test_search_feed_empty_query_returns_422(self, client):
-        """空关键词违反 min_length=1 → 422（feed.py:738 Query 校验）"""
-        response = client.get("/api/feed/search?q=")
-
-        assert response.status_code == 422
-
-    def test_search_feed_invalid_type_returns_422(self, client):
-        """非法搜索类型（白名单 all/title/tag/author 之外）→ 422"""
-        response = client.get("/api/feed/search?q=test&search_type=bogus")
-
-        assert response.status_code == 422
 
 
 @pytest.mark.api

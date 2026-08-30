@@ -114,8 +114,8 @@ class TestUpdateCourse:
             json={"title": "尝试更新"}
         )
         
-        # 应该返回403或404
-        assert response.status_code in [403, 404]
+        # 实现：course.py:285 校验作者归属 → "无权操作此课程" code=403
+        assert response.status_code == 403
 
 
 @pytest.mark.api
@@ -123,7 +123,7 @@ class TestCourseVideos:
     """测试课程视频管理"""
     
     def test_add_video_to_course(self, course_client, auth_headers, test_course, test_video, test_user, db):
-        """测试添加视频到课程"""
+        """测试添加视频到课程（断言数据库最终态：关联行已创建）"""
         # 确保课程和视频都属于当前用户
         test_course.author_id = test_user.id
         test_video.author_id = test_user.id
@@ -138,6 +138,13 @@ class TestCourseVideos:
         assert response.status_code == 200
         data = response.json()
         assert data["code"] == 200
+        # 数据库最终态：课程-视频关联已创建
+        from common.models import CourseVideo
+        link = db.query(CourseVideo).filter(
+            CourseVideo.course_id == test_course.id,
+            CourseVideo.video_id == test_video.id
+        ).first()
+        assert link is not None
     
     def test_remove_video_from_course(self, course_client, auth_headers, test_course, test_video, db, test_user):
         """测试从课程移除视频"""
@@ -163,6 +170,12 @@ class TestCourseVideos:
         assert response.status_code == 200
         data = response.json()
         assert data["code"] == 200
+        # 数据库最终态：关联行已删除
+        remaining = db.query(CourseVideo).filter(
+            CourseVideo.course_id == test_course.id,
+            CourseVideo.video_id == test_video.id
+        ).first()
+        assert remaining is None
     
     def test_update_video_order(self, course_client, auth_headers, test_course, test_video, db, test_user):
         """测试调整视频顺序"""

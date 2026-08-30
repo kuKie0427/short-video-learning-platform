@@ -41,39 +41,27 @@ def _creds(token: str) -> HTTPAuthorizationCredentials:
 
 @pytest.mark.unit
 class TestVerifyToken:
-    """verify_token：JWT 验签与开发环境直通"""
+    """verify_token：JWT 验签与开发环境直通（数据驱动：无效凭证矩阵）"""
+
+    # (credentials构造器, 用例id) —— 全部应抛 401；统一返回 HTTPAuthorizationCredentials
+    INVALID_CASES = [
+        pytest.param(lambda u: _creds(_make_token(str(u.id), expires_delta=timedelta(minutes=-1))), id="expired"),
+        pytest.param(lambda u: _creds(_make_token(str(u.id), secret=WRONG_SECRET)), id="forged-signature"),
+        pytest.param(lambda u: _creds("not-a-jwt-token"), id="malformed"),
+        pytest.param(lambda u: _creds(_make_token(include_sub=False)), id="missing-sub"),
+    ]
+
+    @pytest.mark.parametrize("creds_builder", INVALID_CASES)
+    def test_invalid_token_raises_401(self, test_user, creds_builder):
+        """无效凭证矩阵：过期/伪造/非法/缺sub → 一律 401"""
+        with pytest.raises(HTTPException) as exc_info:
+            verify_token(creds_builder(test_user))
+        assert exc_info.value.status_code == 401
 
     def test_valid_jwt_returns_user_id(self, test_user):
         """有效 JWT 返回 sub 中的用户ID"""
         token = _make_token(str(test_user.id))
         assert verify_token(_creds(token)) == str(test_user.id)
-
-    def test_expired_jwt_raises_401(self, test_user):
-        """过期 token → 401（JWTError 被捕获并转为 HTTPException）"""
-        token = _make_token(str(test_user.id), expires_delta=timedelta(minutes=-1))
-        with pytest.raises(HTTPException) as exc_info:
-            verify_token(_creds(token))
-        assert exc_info.value.status_code == 401
-
-    def test_forged_signature_raises_401(self, test_user):
-        """错误密钥签发的伪造 token → 401（验签失败）"""
-        token = _make_token(str(test_user.id), secret=WRONG_SECRET)
-        with pytest.raises(HTTPException) as exc_info:
-            verify_token(_creds(token))
-        assert exc_info.value.status_code == 401
-
-    def test_malformed_token_raises_401(self):
-        """格式非法的 token → 401"""
-        with pytest.raises(HTTPException) as exc_info:
-            verify_token(_creds("not-a-jwt-token"))
-        assert exc_info.value.status_code == 401
-
-    def test_jwt_without_sub_raises_401(self):
-        """缺少 sub 字段的合法 JWT → 401（验签通过但无用户标识）"""
-        token = _make_token(include_sub=False)
-        with pytest.raises(HTTPException) as exc_info:
-            verify_token(_creds(token))
-        assert exc_info.value.status_code == 401
 
     def test_dev_mode_uuid_passthrough(self):
         """开发环境后门：UUID 格式字符串直接作为 user_id 放行（压测/联调用）"""

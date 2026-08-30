@@ -23,14 +23,14 @@ class TestSearchSuggest:
         assert "suggestions" in data["data"]
     
     def test_search_suggest_empty_query(self, search_client, auth_headers):
-        """测试空查询"""
+        """测试空查询（q 违反 min_length=1 → 422，search.py:20 Query 校验）"""
         response = search_client.get(
             "/api/search/suggest?q=",
             headers=auth_headers
         )
         
-        # 可能返回200（空结果）或400
-        assert response.status_code in [200, 400, 422]
+        # 实现：q 为 Query(..., min_length=1)，空串 → 422
+        assert response.status_code == 422
     
     def test_search_suggest_no_query(self, search_client, auth_headers):
         """测试缺少查询参数"""
@@ -72,16 +72,46 @@ class TestSearchVideos:
             assert "stats" in item
             assert "play_count" in item["stats"]
     
-    def test_search_videos_sort_by_hot(self, search_client, auth_headers, db, test_user, test_video):
-        """测试按热度排序"""
+    def test_search_videos_sort_by_hot(self, search_client, auth_headers, db, test_user, test_user2, test_video):
+        """按热度排序：互动量高的视频排在前面
+
+        缺陷回归：hot 分支原与 latest 同序（伪实现），已改为互动总量聚合排序。
+        """
+        from faker import Faker
+        from common.models import Like, Video
+        fake = Faker('zh_CN')
+
+        # 建两个视频：hot_video 有 2 个点赞，cold_video 无互动
+        def make_video(title):
+            v = Video(
+                id=str(fake.uuid4()), author_id=test_user.id, title=title,
+                description=title, tags=["热度"], duration=60,
+                play_url=fake.url(), cover_url=fake.image_url(),
+                language="zh-CN", status="online", video_type="short"
+            )
+            db.add(v)
+            db.commit()
+            db.refresh(v)
+            return v
+
+        hot_video = make_video("热度排序测试视频A")
+        cold_video = make_video("热度排序测试视频B")
+        db.add(Like(user_id=test_user.id, video_id=hot_video.id))
+        db.add(Like(user_id=test_user2.id, video_id=hot_video.id))
+        db.commit()
+
         response = search_client.get(
             "/api/search/videos?sort_by=hot",
             headers=auth_headers
         )
-        
+
         assert response.status_code == 200
         data = response.json()
         assert data["code"] == 200
+        items = data["data"]["items"]
+        video_ids = [item["video_id"] for item in items]
+        # 互动量高的视频必须排在无互动视频之前
+        assert video_ids.index(str(hot_video.id)) < video_ids.index(str(cold_video.id))
     
     def test_search_videos_with_tags(self, search_client, auth_headers, db, test_user, test_video):
         """测试按标签搜索"""

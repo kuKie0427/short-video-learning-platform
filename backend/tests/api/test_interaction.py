@@ -210,6 +210,6 @@ class TestComment:
             headers=auth_headers
         )
         
-        # 应该返回403或404
-        assert response.status_code in [403, 404]
+        # 实现：interaction.py:322 校验评论归属 → "无权删除此评论" code=403
+        assert response.status_code == 403
 

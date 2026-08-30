@@ -26,8 +26,8 @@ class TestFollowUser:
             headers=auth_headers
         )
         
-        # 应该返回400或403
-        assert response.status_code in [400, 403]
+        # 实现：follow.py:57-59 校验不能关注自己 → code=400
+        assert response.status_code == 400
     
     def test_follow_nonexistent_user(self, client, auth_headers):
         """测试关注不存在的用户"""
@@ -50,7 +50,7 @@ class TestUnfollowUser:
     """测试取消关注接口"""
     
     def test_unfollow_user_success(self, client, auth_headers, test_user, test_user2, db):
-        """测试成功取消关注"""
+        """测试成功取消关注（断言数据库最终态：Follow 行已删除）"""
         # 先创建关注关系
         from common.models import Follow
         follow = Follow(
@@ -69,6 +69,12 @@ class TestUnfollowUser:
         assert response.status_code == 200
         data = response.json()
         assert data["code"] == 200
+        # 数据库最终态：关注关系已删除
+        remaining = db.query(Follow).filter(
+            Follow.follower_id == test_user.id,
+            Follow.following_id == test_user2.id
+        ).first()
+        assert remaining is None
 
 
 @pytest.mark.api

@@ -53,7 +53,7 @@ class TestGetStorageServiceFactory:
         monkeypatch.setenv("STORAGE_TYPE", "s3")
         monkeypatch.setenv("S3_ENDPOINT", "http://localhost:9000")
 
-        # 注入假 boto3 避免真实 SDK 依赖
+        # 注入假 boto3 避免真实 SDK 依赖（monkeypatch.setitem 自动还原）
         class FakeClient:
             def head_bucket(self, **kw):
                 raise Exception("not found")
@@ -65,36 +65,26 @@ class TestGetStorageServiceFactory:
         fake_mod.client = mock.MagicMock(return_value=FakeClient())
         cfg_mod = types.ModuleType("botocore.config")
         cfg_mod.Config = mock.MagicMock
-        sys.modules["boto3"] = fake_mod
-        sys.modules["botocore.config"] = cfg_mod
-        try:
-            service = get_storage_service()
-        finally:
-            sys.modules.pop("boto3", None)
-            sys.modules.pop("botocore.config", None)
+        monkeypatch.setitem(sys.modules, "boto3", fake_mod)
+        monkeypatch.setitem(sys.modules, "botocore.config", cfg_mod)
 
+        service = get_storage_service()
         assert isinstance(service, S3StorageService)
 
 
 @pytest.mark.unit
 class TestS3StorageService:
-    """S3 存储（注入假 boto3）"""
+    """S3 存储（注入假 boto3，monkeypatch.setitem 自动还原）"""
 
-    def _install_fake_boto3(self, client):
+    def _install_fake_boto3(self, monkeypatch, client):
         fake_mod = types.ModuleType("boto3")
         fake_mod.client = mock.MagicMock(return_value=client)
         cfg_mod = types.ModuleType("botocore.config")
         cfg_mod.Config = mock.MagicMock
-        sys.modules["boto3"] = fake_mod
-        sys.modules["botocore.config"] = cfg_mod
+        monkeypatch.setitem(sys.modules, "boto3", fake_mod)
+        monkeypatch.setitem(sys.modules, "botocore.config", cfg_mod)
 
-    @pytest.fixture(autouse=True)
-    def _cleanup(self):
-        yield
-        sys.modules.pop("boto3", None)
-        sys.modules.pop("botocore.config", None)
-
-    def test_upload_builds_url(self):
+    def test_upload_builds_url(self, monkeypatch):
         class FakeClient:
             def head_bucket(self, **kw):
                 raise Exception()
@@ -105,13 +95,13 @@ class TestS3StorageService:
             def put_object(self, **kw):
                 pass
 
-        self._install_fake_boto3(FakeClient())
+        self._install_fake_boto3(monkeypatch, FakeClient())
         service = S3StorageService("http://localhost:9000", "ak", "sk", "videos")
         url = service.upload_file(b"data", "videos/1.mp4", content_type="video/mp4")
 
         assert url == "http://localhost:9000/videos/videos/1.mp4"
 
-    def test_delete_failure_returns_false(self):
+    def test_delete_failure_returns_false(self, monkeypatch):
         class FakeClient:
             def head_bucket(self, **kw):
                 raise Exception()
@@ -122,11 +112,11 @@ class TestS3StorageService:
             def delete_object(self, **kw):
                 raise RuntimeError("s3 down")
 
-        self._install_fake_boto3(FakeClient())
+        self._install_fake_boto3(monkeypatch, FakeClient())
         service = S3StorageService("http://localhost:9000", "ak", "sk", "videos")
         assert service.delete_file("videos/1.mp4") is False
 
-    def test_file_exists_head_failure_returns_false(self):
+    def test_file_exists_head_failure_returns_false(self, monkeypatch):
         class FakeClient:
             def head_bucket(self, **kw):
                 raise Exception()
@@ -137,13 +127,13 @@ class TestS3StorageService:
             def head_object(self, **kw):
                 raise Exception("not found")
 
-        self._install_fake_boto3(FakeClient())
+        self._install_fake_boto3(monkeypatch, FakeClient())
         service = S3StorageService("http://localhost:9000", "ak", "sk", "videos")
         assert service.file_exists("videos/1.mp4") is False
 
-    def test_sdk_missing_raises_import_error(self):
+    def test_sdk_missing_raises_import_error(self, monkeypatch):
         """boto3 未安装时应给出明确错误而非崩溃"""
-        sys.modules.pop("boto3", None)
-        sys.modules.pop("botocore", None)
+        monkeypatch.setitem(sys.modules, "boto3", None)
+        monkeypatch.setitem(sys.modules, "botocore", None)
         with pytest.raises(ImportError):
             S3StorageService("http://localhost:9000", "ak", "sk", "videos")
