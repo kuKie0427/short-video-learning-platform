@@ -1,0 +1,112 @@
+手工冒烟一手执行记录
+日期：2026-09-09（本机 Docker 全栈：7 服务 + 网关 :80 + PostgreSQL 14 + Redis 7 + 前端 vite dev :3000）
+执行方式：curl / backend/scripts/manual_smoke_upload.py；开发态 UUID 直通鉴权（common/utils/auth.py DEV 分支）
+关联：backend/docs/手工测试用例-正式版.md 的 S/A/U/P/R/I/E 条目；缺陷见 backend/docs/缺陷台账.md § D
+
+────────────────────────────────────────────────────────────────────────
+【S15】网关与服务健康检查
+$ curl -s -w " [%{http_code}]\n" http://localhost/health
+  healthy [200]                                      # 网关自身探活
+$ for p in 8001..8007; curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:$p/health
+  8001:200 8002:200 8003:200 8004:200 8005:200 8006:200 8007:200   # 7 服务全 healthy
+$ curl -s -o /dev/null -w "%{http_code}" http://localhost/api/auth/health
+  404                                                # ← 文档旧口径错误，见 BUG-017
+$ curl -s -o /dev/null -w "%{http_code}" http://localhost/api/feed/health
+  404                                                # ← 同上
+
+【A06】伪造 / 缺失凭证
+$ curl -H 'Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.<伪造签名>.<伪造签名>' http://localhost/api/auth/profile
+  401 {"code":401,"message":"认证凭证已过期","data":null}
+$ curl http://localhost/api/auth/profile
+  403 {"detail":"Not authenticated"}                 # HTTPBearer 缺凭证默认 403（对照组）
+
+【R02】LIKE 通配符字面量匹配（BUG-009 回归）
+库内基线：2 条 status=online 的短视频（3分钟学习微积分 / 雅思3分钟学习）
+$ GET /api/search/videos?q=%      -> 200 total=0 items=[]     # % 未被当通配符，未返回全库 ✓
+$ GET /api/search/videos?q=_      -> 200 total=0 items=[]     # 同上 ✓
+$ GET /api/search/videos?q=\      -> 200 total=0 items=[]     # 同上 ✓
+$ GET /api/search/videos?q=微积分 -> 200 total=1 [3分钟学习微积分]   # 对照组：证明不是"永远返回空" ✓
+
+【R03】SQL 注入载荷当字面量
+$ GET /api/search/videos?q=' OR '1'='1   -> 200 total=0 items=[]
+  无 500、无全库泄露 ✓
+
+【R04】分页边界（/api/feed/search，Query(ge=1, le=50)）
+$ ?page_size=0   -> 422 ✓
+$ ?page_size=51  -> 422 ✓
+
+【R05】关键词长度边界 —— 本轮暴露测试文档自身溯源错误
+$ GET /api/feed/search?q=<101 字符>     -> 422 ✓   # feed.py:737 Query(max_length=100)
+$ GET /api/feed/search?q=               -> 422 ✓
+$ GET /api/search/suggest?q=            -> 422 ✓   # search.py:20 Query(min_length=1, max_length=100)
+$ GET /api/search/videos?q=<101 字符>   -> 200 ✗与用例原预期不符  # search.py:78 q 可选、无长度校验
+$ GET /api/search/videos?q=             -> 200 返回全量 2 条      # 同上
+→ 处理：用例 R05 预期已按端点拆分；"同类校验规则不一致"计入测试总结报告 §5 遗留风险 5（与 BUG-006 同类，未改代码）
+
+【R06】hot 与 latest 序必须可区分（BUG-015 回归）
+造数前（两视频互动量均为 0）：
+  latest -> ['雅思3分钟学习', '3分钟学习微积分']
+  hot    -> ['雅思3分钟学习', '3分钟学习微积分']       # 同序属预期：无互动差异时热度并列
+造数（SQL 给"3分钟学习微积分"插 3 条 likes，验证外键可用后计数）：
+  latest -> ['雅思3分钟学习'(0 赞), '3分钟学习微积分'(3 赞)]
+  hot    -> ['3分钟学习微积分'(3 赞), '雅思3分钟学习'(0 赞)]   # 两序相反 ✓
+SQL 侧一致性：SELECT video_id,count(*) FROM likes GROUP BY 1 -> 00000000-...-0001|3
+
+【U09】无效 base64 图片（BUG-014 回归：客户端错误不得冒泡 500）
+$ POST /api/upload/image {"image":"@@@not-base64@@@"}
+  HTTP 422 {"code":422,"message":"无效的图片数据（Base64 解码失败）"} ✓
+
+【U08】越权合并他人上传任务
+$ A(…0001) init -> upload_id=UP_479f3b3f
+$ B(77777777-…) POST /api/upload/complete {"upload_id":"UP_479f3b3f"}
+  404 {"code":404,"message":"上传任务不存在"}          # 按 (upload_id, user_id) 过滤，不泄露资源存在性
+→ 用例 U08 原预期 403 有误（那是"资源存在但不属于你"的语义），已勘误为 404；与 API设计文档错误语义表一致
+
+【P03】切分任务用户隔离（BUG-013 回归）
+$ B GET /api/split/tasks  -> 200 {"data":[]}
+$ A GET /api/split/tasks  -> 200 {"data":[{"task_id":"split_b96feeb7","video_id":"9d8e1944-…", …}]}
+  B 看不到 A 的任务 ✓（列表维度；单任务详情越权按 API 文档为 404）
+
+【I01 / E02】点赞状态机不漂移（同一用户连点 10 次）
+$ for i in 1..10: POST /api/interaction/like {"video_id":"00000000-…-0002"}
+  1 -> is_liked=True  like_count=1
+  2 -> is_liked=False like_count=0
+  3 -> is_liked=True  like_count=1
+  … 严格交替 …
+ 10 -> is_liked=False like_count=0
+$ SELECT count(*) FROM likes WHERE video_id=… AND user_id=…  -> 0（偶数次回到未点赞）
+  任意时刻未出现多行、无计数漂移 ✓
+→ 用例 I01 原预期"连点 10 次库中恰 1 行"错误：该接口是 toggle 语义，偶数次必然 0 行；已改为状态机口径
+
+【U01 / U02】分片上传全链路 + 落库一致性（BUG-004 三位一体回归）
+$ cd backend && .venv/bin/python scripts/manual_smoke_upload.py
+  素材 3分钟学习微积分.mp4  8107314 bytes  分片数 2
+  PASS init 返回 200
+  PASS init 响应含 upload_id            (UP_4161ded9)
+  PASS chunk_size 契约 = 5242880
+  PASS chunk[0] 5242880B 上传成功       (200 分片上传成功)
+  PASS chunk[1] 2864434B 上传成功       (200 分片上传成功)
+  PASS complete 返回 200 / 业务信封 code=200 / data 非空
+  PASS 响应含 video_id + status + file_url (f7fe472d-… | transcoding)
+  PASS videos 表存在该记录（落库一致）
+       f7fe472d-ee20-4e38-aa37-cf71755f517a|手工用例U01-冒烟留痕|transcoding|180|short
+  退出码 0
+
+【BUG-016 定界证据】网关上游 IP 陈旧 → /api/split/* 全 502
+$ curl -o /dev/null -w "%{http_code}" http://localhost/api/split/tasks        -> 502
+$ docker exec api_gateway wget -qO- http://split_service:8004/health          -> {"status":"healthy","service":"split"}
+$ docker logs api_gateway | grep error
+  connect() failed (111: Connection refused) while connecting to upstream,
+  request: "POST /api/split/direct-split", upstream: "http://172.19.0.10:8004/api/split/direct-split"
+$ docker exec api_gateway nginx -s reload
+$ curl … http://localhost/api/split/tasks                                     -> 403 {"detail":"Not authenticated"}
+$ curl … http://localhost/api/split/tasks -H "Authorization: Bearer <DEV_UUID>" -> 200（上游已恢复连通；此前为 502）
+→ 结论：不是产品功能缺陷，是 nginx 启动期一次性解析 upstream 并缓存容器 IP；容器重建后 IP 变更未刷新
+→ E2E 首跑 5/6 失败即此因；reload 后 6/6 全绿（19.6s）
+
+【自动化套件同一天的复测基线】
+pytest tests/ -q --no-cov  -> 315 passed  17.68s / 18.48s / 19.54s（三轮）
+pytest tests/ -q           -> 315 passed  22.01s，Total coverage: 75.37%
+scripts/check_coverage_gates.py -> 12/15/45/64/61% 全过底线（10/15/45/60/60）
+npx vitest run             -> 10 passed  5.18s
+npx playwright test        -> 6 passed   19.6s（reload 后）

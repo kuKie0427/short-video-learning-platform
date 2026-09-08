@@ -1,845 +1,255 @@
-# 🎓 短视频学习平台
+# 短视频学习平台
 
-<div align="center">
-
-**基于AI的智能短视频学习平台**
-
-集成 SenseVoice 语音识别 + GLM-4.5V 多模态分析 + 智能推荐系统
-
-采用微服务架构，提供完整的视频处理、内容推荐、课程管理等功能
+基于 AI 的智能短视频学习平台。集成 SenseVoice 语音识别、GLM 多模态分析与智能推荐系统，采用微服务架构，覆盖视频上传、智能拆分、内容推荐、课程管理全流程。
 
 [![Tests](https://img.shields.io/badge/tests-315%20passed-brightgreen)]()
-[![Coverage](https://img.shields.io/badge/coverage-75.5%25-yellow)]()
+[![Coverage](https://img.shields.io/badge/coverage-75.4%25-yellow)]()
 [![Python](https://img.shields.io/badge/python-3.11%2B-blue)]()
-[![FastAPI](https://img.shields.io/badge/FastAPI-0.115%2B-009688)]()
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.104-009688)]()
 [![React](https://img.shields.io/badge/React-18.3%2B-61dafb)]()
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.5%2B-3178c6)]()
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.9-3178c6)]()
 [![Docker](https://img.shields.io/badge/Docker-24%2B-2496ed)]()
-[![License](https://img.shields.io/badge/license-MIT-green)]()
 
-[快速开始](#快速开始) • [功能特性](#项目特色) • [技术架构](#技术架构) • [文档](#文档) • [部署](#部署说明)
-
-</div>
+[快速开始](#快速开始) · [核心功能](#核心功能) · [架构概览](#架构概览) · [文档导航](#文档导航)
 
 ---
 
-## ✨ 项目特色
+## 核心功能
 
-### 🤖 AI智能处理
-- **SenseVoice 语音识别** - 高精度语音转文字，支持中日韩英多语言（准确率>95%）
-- **GLM-4.5V 多模态分析** - 视觉理解 + 内容分析，智能识别知识点
-- **智能场景检测** - 基于 OpenCV 的关键帧提取（准确率>90%）
-- **知识点边界识别** - 自动定位教学内容的起止位置
-- **个性化推荐** - 4种推荐算法混合的智能内容推荐系统（召回率>85%）
+**智能视频拆分（核心亮点）**
 
-### 🎬 视频处理能力
-- **智能视频分割** - 自动识别知识点边界，精准切分长视频为短片段
-- **可选发布机制** - 分割后可选择性发布高质量片段到主页
-- **分片上传** - 支持大文件断点续传（5MB/片）
-- **多格式支持** - 兼容 MP4、AVI、MOV 等主流格式
-- **批量处理** - 异步任务队列支持高并发处理
-- **缩略图生成** - 自动生成视频封面和预览缩略图
+SenseVoiceSmall ASR 语音转文字（中日韩英多语种）+ OpenCV 关键帧提取 + GLM 多模态知识点边界识别，三路信号融合后自动切分长视频为独立知识点片段。无 GLM Key 时降级为等长切分。拆分任务经 Celery 异步执行，不阻塞 API 进程。
 
-### 🏗️ 微服务架构
-- **7个独立微服务** - 高内聚低耦合的服务设计
-- **Nginx API网关** - 统一入口，智能路由转发
-- **Docker 容器化** - 一键部署，环境隔离
-- **水平扩展** - 支持服务独立扩容
-- **健康检查** - 完善的服务监控和自动恢复
+**视频上传与管理**
 
-### 🎯 内容推荐系统
-- **内容相似度推荐** - 基于视频特征向量的相似内容推荐（TF-IDF + 余弦相似度）
-- **协同过滤** - 基于用户行为的个性化推荐（User-Item CF）
-- **热度推荐** - 智能热门内容推送（时间衰减算法）
-- **混合推荐** - 多算法加权组合优化（Hybrid Recommender）
-- **冷启动处理** - 新用户友好的推荐策略
+分片上传（5MB/片，断点续传）+ FFprobe 格式校验 + 长短视频自动分类。本地磁盘存储，nginx 静态直出，S3 为可选切换。
 
-### 🎨 前端体验
-- **React 18 + TypeScript** - 现代化的前端技术栈
-- **响应式设计** - 移动端优先，多终端适配
-- **流畅视频播放** - 优化的视频播放器组件
-- **实时交互** - 点赞、收藏、评论即时反馈
-- **Vite 构建** - 极速开发体验
+**内容推荐系统**
 
-## 🚀 快速开始
+四种策略混合：内容相似度（TF-IDF + 余弦）、协同过滤（User-Item CF）、时间衰减热度排序、加权混合推荐。覆盖已发布视频片段，支持 Redis 缓存与冷启动降级。
 
-### 📋 环境要求
-- **Docker** 和 **Docker Compose** 24+ （推荐）
-- 或 **Python 3.11+**、**PostgreSQL 14+**、**Redis 7+**（本地开发）
-- **Node.js 18+** 和 **npm/pnpm**（前端开发）
-- **FFmpeg 4.0+**（用于视频处理）
-- **GLM-4.5V API Key**（用于知识点分析，可选）
+**用户认证与互动**
 
-### ⚡ 一键启动（推荐）
+手机验证码登录（Redis 存储）+ JWT 双令牌（Access + Refresh）。点赞、收藏、评论（树状结构）、关注，均提供幂等性保证。
+
+**课程管理与搜索**
+
+课程 CRUD、视频关联（多对多）、学习进度追踪。全文搜索 + 搜索建议 + 多维排序筛选。
+
+**消息通知**
+
+系统公告、互动通知，异步推送。
+
+---
+
+## 架构概览
+
+### 服务组成
+
+| 组件 | 端口 | 说明 |
+|------|------|------|
+| Nginx 网关 | :80 | 统一入口，路由转发，静态文件直出 |
+| Auth 服务 | :8001 | 认证授权、用户管理 |
+| Content 服务 | :8002 | Feed 推荐、视频信息、互动、学习记录 |
+| Upload 服务 | :8003 | 分片上传、文件管理 |
+| Split 服务 | :8004 | 视频拆分 API |
+| Split Worker | - | Celery worker，消费拆分任务（Redis broker） |
+| Course 服务 | :8005 | 课程管理 |
+| Search 服务 | :8006 | 搜索与搜索建议 |
+| Notification 服务 | :8007 | 消息通知 |
+| PostgreSQL | :5432 | 主数据库（14 表） |
+| Redis | :6379 | 缓存 / Celery broker / 短信码 / 计数 |
+| Kafka | :9092 | 部署于 compose，业务未接入 |
+
+### 架构图
+
+```
+                      ┌──────────────────┐
+                      │   Nginx Gateway  │
+                      │      :80         │
+                      └────────┬─────────┘
+                               │
+            ┌──────────────────┼──────────────────┐
+            │                  │                  │
+    ┌───────▼───────┐  ┌──────▼──────┐  ┌───────▼────────┐
+    │ /videos (静态) │  │   /api/*    │  │ /uploads (静态) │
+    └───────────────┘  └──────┬──────┘  └────────────────┘
+                              │
+           ┌──────────────────┼──────────────────┐
+           │                  │                  │
+  ┌────────▼──────┐  ┌───────▼──────┐  ┌───────▼──────┐
+  │  Auth :8001   │  │Content :8002 │  │Upload :8003  │
+  └───────────────┘  └──────────────┘  └──────────────┘
+           │                  │                  │
+  ┌────────▼──────┐  ┌───────▼──────┐  ┌───────▼──────┐
+  │  Split :8004  │  │Course :8005  │  │Search :8006  │
+  └───────┬───────┘  └──────────────┘  └──────────────┘
+          │
+  ┌───────▼─────────────────────────────┐
+  │ Split Worker (Celery, Redis broker) │
+  │ SenseVoice + OpenCV + GLM 管线      │
+  └─────────────────────────────────────┘
+
+  ┌──────────────────────────────────────┐
+  │ Notification :8007                  │
+  └──────────────────────────────────────┘
+            │                │
+  ┌─────────▼────┐  ┌───────▼──────┐
+  │ PostgreSQL   │  │    Redis     │
+  │ :5432 (14表) │  │ :6379       │
+  └──────────────┘  └──────────────┘
+```
+
+### 存储与基础设施
+
+| 基础设施 | 选型 | 说明 |
+|----------|------|------|
+| 数据库 | PostgreSQL 14 | 14 张核心表，单库共享，Alembic 迁移 |
+| 缓存 / 消息 | Redis 7 | Celery broker、会话、验证码、计数器 |
+| 文件存储 | 本地 data/uploads | nginx 静态直出；S3 为可选切换 |
+| 容器编排 | Docker Compose | 一键启动全部服务 |
+
+> Kafka 部署于 compose 但业务层未接入，消息通知当前走 Redis 异步。
+
+### 技术栈
+
+| 层次 | 技术 |
+|------|------|
+| 后端框架 | FastAPI 0.104.1（`requirements.txt` 锁定版本），Python 3.11+ |
+| ORM | SQLAlchemy 2.0+，Alembic |
+| AI 模型 | SenseVoiceSmall（ASR）、GLM 多模态（知识点分析）、OpenCV（关键帧） |
+| 前端 | React 18.3 + TypeScript 5（声明 `^5.2`，实装 5.9）+ Vite 5.4 |
+| 样式 | Tailwind CSS 3.4+ |
+| 测试 | pytest（后端）、Vitest + React Testing Library（前端）、Playwright（E2E） |
+
+### 数据库
+
+14 张核心表：users, videos, long_videos, learn_records, comments, likes, favorites, follows, upload_tasks, notifications, split_tasks, split_segments, courses, course_videos。完整字段、索引、关系详见[数据库设计文档](./backend/docs/数据库设计文档.md)。
+
+---
+
+## 快速开始
+
+**一键启动（推荐）**
 
 ```bash
-# 1. 克隆项目
-git clone https://github.com/cherloner/videocut.git
-cd my-project
+# 1. 克隆
+git clone https://github.com/kuKie0427/short-video-learning-platform.git
+cd short-video-learning-platform
 
-# 2. 启动后端服务（包含数据库、Redis、API网关等）
+
+# 2. 启动后端（含数据库、Redis、全部微服务）
 cd backend
 docker-compose up -d
 
-# 3. 启动前端开发服务器
+# 3. 启动前端
 cd ../frontend
 npm install
 npm run dev
 
-# 4. 访问应用
-# 前端: http://localhost:3000
-# 后端API: http://localhost/docs
-# API网关: http://localhost
+# 4. 访问
+# 前端:  http://localhost:3000
+# API:   http://localhost/docs
+# 网关:  http://localhost
 ```
 
-### 🔧 验证服务
+**验证**
 
 ```bash
-# 检查所有容器状态
-docker-compose ps
-
-# 测试认证服务
-curl http://localhost/api/auth/health
-
-# 测试推荐服务
-curl http://localhost/api/feed/health
-
-# 查看日志
-docker-compose logs -f
+docker-compose ps                              # 检查容器状态
+curl http://localhost/health                   # 网关自身探活，返回 healthy
+curl http://localhost:8001/health              # 服务健康检查走各自端口（Auth 示例）
+curl http://localhost/api/feed/hot?page=1      # 经网关验业务链路（只转发 /api/* 业务路由）
 ```
 
-**详细步骤**: 查看 [快速启动指南](./backend/QUICK_START.md)
-
-### 本地开发模式
-
-```bash
-# 1. 安装Python依赖
-cd backend
-pip install -r requirements.txt
-
-# 2. 启动基础设施
-docker-compose up -d postgres redis kafka
-
-# 3. 创建测试数据库
-python scripts/create_test_db.py
-
-# 4. 启动服务（以Auth服务为例）
-cd services/auth
-python -m uvicorn app.main:app --host 0.0.0.0 --port 8001 --reload
-```
-
-**详细步骤**: 查看 [后端启动指南](./backend/docs/启动指南.md)
-
-## 📁 项目结构
-
-```
-my-project/
-├── backend/                        # 后端服务（微服务架构）
-│   ├── common/                     # 共享库（所有微服务共享）
-│   │   ├── models/                 # SQLAlchemy 数据模型
-│   │   ├── utils/                  # 工具函数（auth、redis、response等）
-│   │   ├── database/               # 数据库连接管理
-│   │   ├── config/                 # 配置管理
-│   │   └── messaging/              # Kafka 消息队列
-│   ├── services/                   # 微服务目录
-│   │   ├── auth/                   # 认证授权服务 (8001)
-│   │   ├── content/                # 内容推荐服务 (8002)
-│   │   ├── upload/                 # 视频上传服务 (8003)
-│   │   ├── split/                  # 视频切分服务 (8004) ⭐
-│   │   ├── course/                 # 课程管理服务 (8005)
-│   │   ├── search/                 # 搜索服务 (8006)
-│   │   └── notification/           # 消息通知服务 (8007)
-│   ├── gateway/                    # Nginx API网关配置
-│   │   └── nginx.conf              # 反向代理 + 静态文件服务
-│   ├── data/                       # 数据存储目录
-│   │   ├── videos/                 # 本地视频文件
-│   │   ├── uploads/                # 用户上传文件
-│   │   └── temp/                   # 临时处理文件
-│   ├── docs/                       # 完整的文档中心
-│   ├── tests/                      # 测试套件（315 用例：API 164 + 单元 151，43 例参数化）
-│   ├── scripts/                    # 工具脚本
-│   ├── alembic/                    # 数据库迁移
-│   └── docker-compose.yml          # Docker 编排文件
-├── frontend/                       # 前端应用 (React + TypeScript)
-│   ├── src/
-│   │   ├── components/             # 通用组件
-│   │   │   ├── VideoPlayer.tsx     # 视频播放器组件
-│   │   │   ├── VideoCard.tsx       # 视频卡片组件
-│   │   │   └── ...
-│   │   ├── pages/                  # 页面组件
-│   │   │   ├── Home.tsx            # 首页（视频流）
-│   │   │   ├── VideoSplit.tsx      # 视频切分页面
-│   │   │   └── ...
-│   │   ├── services/               # API 服务
-│   │   │   ├── api.ts              # API 配置
-│   │   │   ├── videoApi.ts         # 视频相关 API
-│   │   │   └── mockData.ts         # Mock 数据
-│   │   ├── context/                # React Context
-│   │   └── hooks/                  # 自定义 Hooks
-│   ├── public/                     # 静态资源
-│   └── vite.config.ts              # Vite 配置
-├── SenseVoiceSmall/                # SenseVoice 语音识别模型
-│   ├── model.pt                    # 预训练模型文件（1.2GB）
-│   ├── config.yaml                 # 模型配置
-│   ├── tokens.json                 # 词表文件
-│   └── chn_jpn_yue_eng_ko_spectok.bpe.model  # BPE 模型
-└── utils/                          # SenseVoice 推理工具
-    ├── ctc_alignment.py            # 语音对齐工具
-    └── infer_utils.py              # 推理工具
-
-详细结构: backend/PROJECT_STRUCTURE.md
-```
-
-## 🎯 核心功能
-
-### 1. 🔐 用户认证系统
-- **手机号验证码登录** - 支持Redis fallback机制
-- **JWT Token认证** - 安全的身份验证（Access + Refresh Token）
-- **用户资料管理** - 完整的用户信息CRUD
-- **角色权限控制** - 灵活的权限管理系统
-
-### 2. 📤 视频上传与管理
-- **分片上传** - 支持大文件上传（5MB/片），断点续传
-- **格式校验** - 自动检测视频格式和元数据（FFprobe）
-- **长短视频分类** - 自动识别并分类处理（长视频>5分钟）
-- **上传进度跟踪** - 实时上传进度反馈
-
-### 3. ✂️ 智能视频切分 ⭐
-
-**完整处理流程（5步）**:
-1. **音频提取** - FFmpeg提取音频流 (MP4→WAV, 16kHz采样)
-2. **语音识别** - SenseVoice模型转文字（支持中日韩英，准确率>95%）
-3. **关键帧检测** - OpenCV场景切换识别（直方图差分算法）
-4. **知识点分析** - GLM-4.5V多模态理解，识别教学内容边界
-5. **视频分割** - 基于知识点边界的精准切分，生成独立片段
-
-**特性**:
-- ✅ 场景检测准确率 >90%
-- ✅ 支持自动和手动模式
-- ✅ 实时进度跟踪（前端轮询任务状态接口，WebSocket 为路线图项）
-- ✅ 异步任务处理（不阻塞主线程）
-- ✅ **可选发布机制** - 分割后可选择高质量片段发布到主页
-- ✅ 缩略图自动生成
-
-**API端点**:
-- `POST /api/split/analyze` - 分析视频，生成切分建议
-- `POST /api/split/publish-segments` - 发布选中的视频片段
-- `GET /api/split/task/{task_id}` - 查询任务状态
-
-### 4. 🎲 内容推荐系统
-
-**4种推荐策略**:
-- **内容推荐** (Content-based) - 基于视频特征相似度（TF-IDF + 余弦相似度）
-- **协同过滤** (Collaborative Filtering) - 基于用户行为模式（User-Item矩阵分解）
-- **热度推荐** (Popularity-based) - 按时间窗口的热度排序（时间衰减算法）
-- **混合推荐** (Hybrid) - 多算法加权组合（Content 40% + Collaborative 30% + Popularity 30%）
-
-**推荐场景**:
-- 📱 **智能推荐流** - 个性化内容推送（主页Feed）
-- 🔥 **热门视频** - 平台热门内容（热度榜）
-- 👥 **关注用户流** - 关注用户的最新动态
-- 🎯 **多样化推荐** - 避免信息茧房，推荐多样性
-
-**特性**:
-- ✅ 包含已发布的视频片段（status='published'）
-- ✅ Redis缓存支持（TTL=300s）
-- ✅ 冷启动处理（新用户推荐热门内容）
-- ✅ 匿名用户支持
-
-### 5. 💬 用户互动
-- **点赞/收藏** - 支持点赞、收藏功能，实时统计
-- **评论系统** - 支持评论和回复（树状结构）
-- **关注功能** - 用户关注/取关，关注列表
-- **互动统计** - 实时统计点赞、播放、收藏等数据
-
-### 6. 📚 课程管理
-- **课程CRUD** - 完整的课程管理（创建、编辑、删除）
-- **视频关联** - 课程与视频的关联管理（多对多关系）
-- **学习进度** - 播放进度跟踪（last_position, completed_ratio）
-- **课程列表** - 支持分页和筛选
-
-### 7. 🔍 搜索功能
-- **视频搜索** - 支持标题、标签、描述全文搜索
-- **搜索建议** - 智能搜索提示（基于历史搜索）
-- **结果排序** - 多维度排序（相关度、热度、时间）
-- **高级筛选** - 按标签、时长、类型筛选
-
-### 8. 🔔 消息通知
-- **消息列表** - 获取用户消息（系统通知、互动通知）
-- **标记已读** - 消息已读管理
-- **消息推送** - 异步消息通知（基于Kafka）
-- **通知类型** - 点赞、评论、关注、系统公告
-
-## 🛠️ 技术架构
-
-### 后端技术栈
-| 技术 | 版本 | 用途 |
-|------|------|------|
-| **FastAPI** | 0.115+ | 高性能Web框架 |
-| **PostgreSQL** | 14+ | 关系型数据库（生产环境） |
-| **SQLite** | 3.x | 测试数据库 |
-| **SQLAlchemy** | 2.0+ | ORM框架 |
-| **Redis** | 7+ | 缓存 + 会话存储 |
-| **Kafka** | 3.5+ | 消息队列（可选） |
-| **Nginx** | 1.29+ | API网关 + 静态文件服务 |
-| **Docker** | 24+ | 容器化部署 |
-| **Alembic** | 1.13+ | 数据库迁移 |
-| **Pytest** | 8.3+ | 测试框架 |
-
-### 前端技术栈
-| 技术 | 版本 | 用途 |
-|------|------|------|
-| **React** | 18.3+ | UI框架 |
-| **TypeScript** | 5.5+ | 类型安全 |
-| **Vite** | 5.4+ | 构建工具 |
-| **Tailwind CSS** | 3.4+ | 样式框架 |
-| **React Router** | 6.x | 路由管理 |
-| **Axios** | 1.7+ | HTTP客户端 |
-
-### AI模型与算法
-| 模型/算法 | 用途 | 性能指标 |
-|----------|------|---------|
-| **SenseVoice Small** | 语音识别（中日韩英） | 准确率 >95% |
-| **GLM-4.5V** | 多模态视觉理解 | 知识点识别准确率 >90% |
-| **OpenCV** | 场景检测 + 关键帧提取 | 检测准确率 >90% |
-| **TF-IDF + 余弦相似度** | 内容推荐 | 召回率 >80% |
-| **User-Item CF** | 协同过滤推荐 | 覆盖率 >85% |
-| **时间衰减热度算法** | 热度推荐 | 实时性 <1s |
-
-### 系统架构图
-
-```
-                        ┌─────────────────┐
-                        │   Nginx Gateway │
-                        │   (Port 80)     │
-                        └────────┬────────┘
-                                 │
-                 ┌───────────────┼───────────────┐
-                 │               │               │
-        ┌────────▼────────┐ ┌───▼────┐ ┌───────▼────────┐
-        │  Static Files   │ │  /api  │ │   /uploads     │
-        │  (/videos)      │ │        │ │                │
-        └─────────────────┘ └───┬────┘ └────────────────┘
-                                │
-                ┌───────────────┴───────────────┐
-                │                               │
-         ┌──────▼──────┐              ┌────────▼────────┐
-         │ Auth Service │              │ Content Service │
-         │   (8001)     │              │     (8002)      │
-         └──────────────┘              └─────────────────┘
-                │                               │
-         ┌──────▼──────┐              ┌────────▼────────┐
-         │Upload Service│              │ Split Service   │
-         │   (8003)     │              │     (8004)      │ ⭐
-         └──────────────┘              └─────────────────┘
-                │                               │
-         ┌──────▼──────┐              ┌────────▼────────┐
-         │Course Service│              │ Search Service  │
-         │   (8005)     │              │     (8006)      │
-         └──────────────┘              └─────────────────┘
-                │                               │
-         ┌──────▼──────────────────────────────▼────────┐
-         │        Notification Service (8007)           │
-         └──────────────────────────────────────────────┘
-                                 │
-                 ┌───────────────┴───────────────┐
-                 │                               │
-         ┌───────▼────────┐            ┌────────▼────────┐
-         │   PostgreSQL   │            │     Redis       │
-         │   (Port 5432)  │            │   (Port 6379)   │
-         └────────────────┘            └─────────────────┘
-                 │                               │
-         ┌───────▼───────────────────────────────▼───────┐
-         │              Kafka (Optional)                 │
-         │              (Port 9092)                      │
-         └───────────────────────────────────────────────┘
-```
-
-### 数据库设计
-- **13张核心表**: users, videos, learn_records, comments, likes, favorites, follows, upload_tasks, notifications, long_videos, split_tasks, split_segments, courses, course_videos
-- **关系设计**: 一对多、多对多关系设计，支持复杂查询
-- **索引优化**: 针对高频查询添加复合索引和GIN索引
-- **触发器**: 自动更新统计数据（点赞数、播放数等）
-
-详细设计: [数据库设计文档](./backend/docs/数据库设计文档.md)
-
-## 📊 项目指标
-
-### 服务状态
-| 指标 | 数值 | 说明 |
-|------|------|------|
-| ✅ **微服务数量** | 7个服务 + 1个网关 | 高内聚低耦合的架构设计 |
-| ✅ **API接口** | 56 个 | 完整的RESTful API |
-| ✅ **测试通过率** | 315 通过 | 后端全量回归 ~13s（实测） |
-| ✅ **代码覆盖率** | 75.5% | 核心模块独立底线门禁（实测，含总量 70% + 分级门禁） |
-| ✅ **前端单测** | 10 通过 | Vitest + React Testing Library |
-| ✅ **前端质量门禁** | ESLint 0 error + 构建通过 | 进 CI（`npm run lint` + `npm run build`） |
-| ✅ **E2E 冒烟** | 6 通过 | Playwright 真实后端链路（进 CI） |
-| ✅ **响应时间** | 聚合 P95 53ms | 性能基线实测（20 并发，详见 perf/BASELINE.md） |
-| ✅ **并发处理** | RPS 15.5 | Locust 基线实测（20 并发，0 失败） |
-
-### AI性能指标
-| 模型/算法 | 指标 | 数值 |
-|----------|------|------|
-| **SenseVoice** | 语音识别准确率 | >95% |
-| **GLM-4.5V** | 知识点识别准确率 | >90% |
-| **OpenCV** | 场景检测准确率 | >90% |
-| **推荐系统** | 召回率 | >85% |
-| **推荐系统** | 覆盖率 | >85% |
-| **推荐系统** | 响应时间 | <100ms |
-
-### 数据库指标
-- **表数量**: 13张核心表
-- **索引数量**: 30+ 个优化索引
-- **查询性能**: 平均查询时间 <50ms
-- **数据一致性**: 使用触发器自动维护统计数据
-
-## 📚 文档
-
-### 🚀 快速开始
-- [**快速启动指南**](./backend/QUICK_START.md) - 一键启动所有服务，5分钟快速体验
-- [**详细启动指南**](./backend/docs/启动指南.md) - 完整的部署步骤和环境配置
-- [**项目结构说明**](./backend/PROJECT_STRUCTURE.md) - 详细的目录结构和文件说明
-
-### 📐 设计文档
-- [**系统架构设计**](./backend/docs/系统架构设计文档.md) - 微服务架构设计和技术选型
-- [**数据库设计**](./backend/docs/数据库设计文档.md) - 13张表的完整结构和关系
-- [**API设计文档**](./backend/docs/API设计文档.md) - 56 个接口的详细文档和示例
-
-### 🔧 开发文档
-- [**运行测试**](./backend/docs/运行测试.md) - 测试环境配置和运行指南
-- [**测试设计文档**](./backend/docs/测试设计文档.md) - 用例设计方法论（等价类/边界值/场景法/缺陷驱动）
-- [**E2E 冒烟测试**](./e2e/README.md) - Playwright 端到端测试（真实后端链路）
-- [**性能基线**](./backend/perf/BASELINE.md) - Locust 压测结果与性能门禁
-- [**故障排查指南**](./backend/docs/故障排查指南.md) - 常见问题解决方案
-- [**数据库本地部署**](./backend/docs/数据库本地部署.md) - PostgreSQL本地部署指南
-- [**文档中心**](./backend/docs/README.md) - 完整的文档索引
-
-### 📝 更新日志
-- [**CHANGELOG**](./backend/CHANGELOG.md) - 版本更新记录
-- [**部署报告**](./DEPLOYMENT_REPORT.md) - 部署总结报告
-- [**功能修复记录**](./VIDEO_UPLOAD_FIX.md) - 视频上传修复记录
-
-## 🔒 安全特性
-
-| 安全措施 | 实现方式 | 说明 |
-|---------|---------|------|
-| ✅ **身份认证** | JWT Token | Access Token + Refresh Token双令牌机制 |
-| ✅ **密码安全** | bcrypt哈希 | 密码加盐哈希存储，不可逆 |
-| ✅ **SQL注入防护** | SQLAlchemy ORM | 参数化查询，自动转义 |
-| ✅ **XSS防护** | 内容转义 | 前端和后端双重转义 |
-| ✅ **CORS配置** | 白名单机制 | 仅允许可信来源访问 |
-| ✅ **文件上传安全** | 类型检测 + 大小限制 | FFprobe验证视频格式 |
-| ✅ **访问权限控制** | 依赖注入 | 基于角色的权限验证 |
-| ✅ **HTTPS支持** | SSL/TLS | 生产环境强制HTTPS |
-| ✅ **敏感数据脱敏** | 日志过滤 | 密码、Token等不记入日志 |
-| ✅ **请求限流** | Redis计数器 | 防止暴力攻击和DDOS |
-
-## 🚢 部署说明
-
-### Docker Compose部署（推荐）⭐
-
-```bash
-cd backend
-
-# 1. 清理旧容器（如果有）
-./scripts/cleanup_docker.sh  # Linux/Mac
-# 或者
-docker-compose down -v       # Windows
-
-# 2. 构建并启动所有服务
-docker-compose up -d --build
-
-# 3. 查看服务状态
-docker-compose ps
-
-# 4. 查看日志
-docker-compose logs -f [service_name]
-
-# 5. 停止服务
-docker-compose down
-
-# 6. 完全清理（包括数据卷）
-docker-compose down -v
-```
-
-### 服务健康检查
-
-```bash
-# 检查所有服务
-curl http://localhost/api/auth/health
-curl http://localhost/api/feed/health
-curl http://localhost/api/upload/health
-curl http://localhost/api/split/health
-
-# 访问API文档
-open http://localhost/docs         # Swagger UI
-open http://localhost/redoc        # ReDoc
-```
-
-### 本地开发部署
-
-```bash
-# 1. 启动基础设施（PostgreSQL + Redis）
-docker-compose up -d postgres redis
-
-# 2. 安装Python依赖
-pip install -r requirements.txt
-
-# 3. 配置环境变量
-cp env.example .env
-# 编辑.env文件，配置数据库、Redis等连接信息
-
-# 4. 运行数据库迁移
-alembic upgrade head
-
-# 5. 启动各个服务（在不同终端）
-cd services/auth && uvicorn app.main:app --port 8001 --reload
-cd services/content && uvicorn app.main:app --port 8002 --reload
-cd services/upload && uvicorn app.main:app --port 8003 --reload
-cd services/split && uvicorn app.main:app --port 8004 --reload
-# ... 其他服务
-
-# 6. 启动Nginx网关
-docker-compose up -d gateway
-
-# 7. 启动前端（新终端）
-cd ../frontend
-npm install
-npm run dev
-```
-
-### 环境变量配置
-
-创建 `backend/.env` 文件:
-
-```bash
-# 数据库配置
-DB_HOST=localhost              # Docker部署时使用 postgres
-DB_PORT=5432
-DB_NAME=short_video_platform
-DB_USER=app_user
-DB_PASSWORD=app_password_2025
-
-# Redis配置
-REDIS_HOST=localhost           # Docker部署时使用 redis
-REDIS_PORT=6379
-REDIS_PASSWORD=                # 可选
-REDIS_DB=0
-
-# Kafka配置（可选）
-KAFKA_BOOTSTRAP_SERVERS=localhost:9092
-KAFKA_ENABLED=false
-
-# JWT配置
-JWT_SECRET_KEY=your-secret-key-change-in-production-environment
-JWT_ALGORITHM=HS256
-JWT_ACCESS_TOKEN_EXPIRE_MINUTES=30
-JWT_REFRESH_TOKEN_EXPIRE_DAYS=7
-
-# SenseVoice配置
-SENSEVOICE_MODEL_PATH=../SenseVoiceSmall/model.pt
-SENSEVOICE_CONFIG_PATH=../SenseVoiceSmall/config.yaml
-
-# GLM-4.5V配置（可选）
-GLM_API_KEY=your-glm-api-key
-GLM_API_URL=https://open.bigmodel.cn/api/paas/v4/chat/completions
-
-# 环境类型
-ENVIRONMENT=development        # development / production / test
-
-# 日志级别
-LOG_LEVEL=INFO                 # DEBUG / INFO / WARNING / ERROR
-
-# 文件上传配置
-MAX_UPLOAD_SIZE=5368709120     # 5GB
-UPLOAD_CHUNK_SIZE=5242880      # 5MB
-```
-
-参考: [backend/env.example](./backend/env.example)
-
-### 生产环境部署建议
-
-1. **使用HTTPS**: 配置SSL证书，强制HTTPS访问
-2. **数据库优化**: 
-   - 调整PostgreSQL配置（shared_buffers, work_mem等）
-   - 定期备份数据库
-   - 配置主从复制
-3. **Redis优化**:
-   - 配置持久化（RDB + AOF）
-   - 设置最大内存和淘汰策略
-4. **监控和日志**:
-   - 集成Prometheus + Grafana监控
-   - 使用ELK Stack日志聚合
-   - 配置告警规则
-5. **负载均衡**:
-   - 使用Nginx负载均衡
-   - 配置多个服务实例
-6. **CDN加速**:
-   - 视频文件使用CDN分发
-   - 静态资源使用CDN
-
-## 🧪 测试
-
-### 运行所有测试
-
-```bash
-cd backend
-
-# 运行所有测试
-pytest tests/ -v
-
-# 运行特定测试模块
-pytest tests/api/ -v           # API测试
-pytest tests/unit/ -v          # 单元测试
-pytest tests/api/test_auth.py -v  # 特定测试文件
-
-# 运行特定测试函数
-pytest tests/api/test_auth.py::TestAuthAPI::test_register -v
-
-# 生成覆盖率报告
-pytest --cov=. --cov-report=html --cov-report=term
-open htmlcov/index.html        # 查看HTML报告
-
-# 显示详细输出
-pytest -vv -s
-
-# 只运行失败的测试
-pytest --lf
-
-# 并行运行测试（需要pytest-xdist）
-pytest -n auto
-```
-
-### 测试配置
-
-后端测试使用**独立 PostgreSQL 测试库**（`short_video_platform_test`），每个用例建表+删表完全隔离，
-不走 SQLite——真实约束/索引/级联是抓缺陷的前提（详见 [测试设计文档](./backend/docs/测试设计文档.md)）。
-
-### 测试统计
-
-```
-📊 后端测试概览（实测，全量回归 ~13s）:
-├── 总测试用例: 315 全通过
-├── 通过率: 100%（2 个历史 xfail 缺陷已修复转正）
-├── 代码覆盖率: 75.5%（实测，总量 70% + 核心模块分级门禁）
-├── 数据驱动: 43 例参数化矩阵
-├── API测试: 165（含安全/幂等性专项）
-├── 单元测试: 151（推荐算法/AI 降级/工具函数）
-
-
-📊 前端测试概览（Vitest + React Testing Library）:
-├── 登录页行为 4 例（等价类/边界值）
-├── AuthContext 状态迁移 3 例
-└── 路由守卫 3 例
-
-📊 E2E 冒烟（Playwright + 真实后端链路）:
-└── 登录/首页/搜索/上传/切分 6 例（进 GitHub Actions CI）
-```
-
-📁 测试分类:
-├── 认证测试 (test_auth.py)
-│   ├── 注册/登录 ✅
-│   ├── Token验证 ✅
-│   └── 用户信息 ✅
-├── 视频测试 (test_video.py)
-│   ├── 上传管理 ✅
-│   ├── 视频信息 ✅
-│   └── 播放统计 ✅
-├── 推荐测试 (test_recommendation.py)
-│   ├── 画像权重/标签排序 ✅
-│   ├── 协同过滤 Golden Path ✅
-│   └── 混合推荐权重影响 ✅
-├── 切分测试 (test_split.py)
-│   ├── 视频分析 ✅
-│   ├── 分割处理 ✅
-│   └── 发布管理 ✅
-├── 幂等性测试 (test_idempotency.py)
-│   ├── 点赞切换/计数一致 ✅
-│   ├── 重复关注/分片重传 ✅
-│   └── 唯一约束并发防线 ✅
-├── 安全测试 (test_security.py)
-│   ├── SQL注入/LIKE通配符 ✅
-│   ├── 认证边界矩阵(401/403) ✅
-│   └── 输入边界/404语义 ✅
-└── 模型测试 (test_models.py)
-    ├── 数据模型 ✅
-    ├── 关系验证 ✅
-    └── 约束检查 ✅
-```
-
-详细说明: [运行测试文档](./backend/docs/运行测试.md)
-
-### 持续集成
-
-项目支持 CI/CD 集成（GitHub Actions 配置示例）:
-
-```yaml
-# .github/workflows/test.yml
-name: Tests
-on: [push, pull_request]
-jobs:
-  test:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-      - name: Set up Python
-        uses: actions/setup-python@v2
-        with:
-          python-version: '3.11'
-      - name: Install dependencies
-        run: |
-          cd backend
-          pip install -r requirements.txt
-      - name: Run tests
-        run: |
-          cd backend
-          pytest --cov=. --cov-report=xml
-      - name: Upload coverage
-        uses: codecov/codecov-action@v2
-```
-
-
-## 🤝 贡献指南
-
-我们欢迎任何形式的贡献！
-
-### 贡献方式
-
-1. **Fork** 本仓库
-2. **创建特性分支** (`git checkout -b feature/AmazingFeature`)
-3. **提交更改** (`git commit -m 'Add some AmazingFeature'`)
-4. **推送到分支** (`git push origin feature/AmazingFeature`)
-5. **创建 Pull Request**
-
-### 开发规范
-
-#### 代码风格
-- **Python**: 遵循 [PEP 8](https://www.python.org/dev/peps/pep-0008/) 代码规范
-- **TypeScript**: 遵循 ESLint 配置
-- 使用有意义的变量名和函数名
-- 添加必要的注释和文档字符串
-
-#### 提交规范
-使用 [Conventional Commits](https://www.conventionalcommits.org/) 规范:
-
-```
-feat: 新功能
-fix: 修复bug
-docs: 文档更新
-style: 代码格式调整
-refactor: 重构
-test: 测试相关
-chore: 构建/工具相关
-```
-
-示例:
-```bash
-git commit -m "feat: 添加视频片段可选发布功能"
-git commit -m "fix: 修复视频播放器进度条显示问题"
-git commit -m "docs: 更新API文档"
-```
-
-#### 测试要求
-- 为新功能编写单元测试
-- 为API更改编写API测试
-- 确保所有测试通过 (`pytest tests/ -v`)
-- 保持代码覆盖率 >70%
-
-#### 文档更新
-- 更新相关的API文档
-- 更新README（如果有重大变更）
-- 添加必要的注释和示例
-
-### 问题报告
-
-如果发现bug或有功能建议，请[创建Issue](https://github.com/cherloner/videocut/issues):
-
-- **Bug报告**: 描述问题、重现步骤、期望行为
-- **功能建议**: 描述建议功能、使用场景、实现思路
-
-### 开发环境设置
-
-```bash
-# 1. Fork并克隆仓库
-git clone https://github.com/YOUR_USERNAME/videocut.git
-cd my-project
-
-# 2. 创建虚拟环境
-python -m venv venv
-source venv/bin/activate  # Linux/Mac
-# 或
-venv\Scripts\activate     # Windows
-
-# 3. 安装依赖
-cd backend
-pip install -r requirements.txt
-
-# 4. 配置pre-commit hooks（可选）
-pip install pre-commit
-pre-commit install
-
-# 5. 运行测试确保环境正常
-pytest tests/ -v
-```
-
-## 🗺️ 路线图
-
-### 已完成 ✅
-- [x] 用户认证和授权系统
-- [x] 视频上传和分片上传
-- [x] SenseVoice语音识别集成
-- [x] GLM-4.5V多模态视频分析
-- [x] 智能视频切分和发布
-- [x] 内容推荐系统（4种算法）
-- [x] 课程管理系统
-- [x] 搜索功能
-- [x] 用户互动（点赞、评论、关注）
-- [x] 消息通知系统
-- [x] 微服务架构实现
-- [x] Docker容器化部署
-- [x] 单元测试和API测试（315 用例，含幂等性/安全专项与数据驱动矩阵）
-- [x] 完整文档体系
-
-### 进行中 🚧
-- [ ] 前端视频切分页面优化
-- [ ] 推荐系统性能优化
-- [ ] 视频转码和多清晰度支持
-- [ ] CDN集成
-
-### 计划中 📅
-- [ ] 直播功能
-- [ ] 弹幕系统
-- [ ] 视频水印和版权保护
-- [ ] 用户行为分析和可视化
-- [ ] 移动端APP（React Native）
-- [ ] 国际化支持（i18n）
-- [ ] 暗黑模式
-- [ ] WebSocket实时通知
-- [ ] GraphQL API支持
-- [ ] Kubernetes部署配置
-- [ ] 性能监控和追踪（Prometheus + Grafana）
-- [ ] A/B测试框架
-- [ ] 机器学习模型优化
-
-## 📄 许可证
-
-本项目采用 **MIT 许可证** - 查看 [LICENSE](LICENSE) 文件了解详情
-
-## 👥 联系方式
-
-<div align="center">
-
-**项目作者**: cherloner
-
-[![GitHub](https://img.shields.io/badge/GitHub-cherloner-181717?logo=github)](https://github.com/cherloner)
-[![Email](https://img.shields.io/badge/Email-1844390881@qq.com-D14836?logo=gmail)](mailto:1844390881@qq.com)
+详细启动步骤与环境变量配置：[快速启动指南](./backend/QUICK_START.md) · [后端启动指南](./backend/docs/启动指南.md)
 
 ---
 
-**如果这个项目对你有帮助，请给一个⭐️Star支持一下！**
+## 测试体系
 
-**Made with ❤️ by cherloner**
+| 类别 | 用例数 | 工具 | 说明 |
+|------|--------|------|------|
+| 后端接口集成测试 | 164（17 文件） | pytest | 真实 PostgreSQL；含幂等、安全专项 |
+| 后端单元测试 | 151（15 文件） | pytest | 推荐算法、AI 降级、工具函数 |
+| └ 其中参数化展开 | 42（13 个 parametrize 块） | pytest `@parametrize` | 认证边界 / 输入校验 / 工厂分支矩阵 |
+| 前端单测 | 10 | Vitest + RTL | 登录、上下文、路由守卫 |
+| E2E 冒烟 | 6（5 spec 文件） | Playwright | 真实后端链路，进 CI |
+| 手工用例 | 56 条编号（附 29 项快查清单） | 测试清单 | 正式版 P0–P2；清单版冒烟13+探索8+视觉8 |
 
-</div>
+全量回归 315 例：纯用例 ~18s、含覆盖率报告 ~22s（2026-09-09 本机复测；轻负载历史实测 ~13s）。覆盖率 75.4%（总量门禁 70% + 5 模块分级门禁 10/15/45/60/60，当前实测 12/15/45/64/61）。
 
+运行方式与用例设计方法论：[运行测试](./backend/docs/运行测试.md) · [测试设计文档](./backend/docs/测试设计文档.md) · [手动测试用例清单](./backend/docs/手动测试用例清单.md) · [E2E 测试](./e2e/README.md)
+
+---
+
+## 文档导航
+
+### 快速开始
+
+| 文档 | 说明 |
+|------|------|
+| [快速启动指南](./backend/QUICK_START.md) | Docker Compose 一键启动 |
+| [后端启动指南](./backend/docs/启动指南.md) | 本地开发环境配置 |
+| [项目结构](./backend/PROJECT_STRUCTURE.md) | 目录结构与文件说明 |
+
+### 设计文档
+
+| 文档 | 说明 |
+|------|------|
+| [系统架构设计](./backend/docs/系统架构设计文档.md) | 微服务架构、技术选型、服务拓扑 |
+| [数据库设计](./backend/docs/数据库设计文档.md) | 14 张表结构、关系、索引 |
+| [API 设计](./backend/docs/API设计文档.md) | 56 个接口详细文档 |
+
+### 测试文档
+
+| 文档 | 说明 |
+|------|------|
+| [测试计划](./backend/docs/测试计划.md) | 范围与不测项、分层、进入/出口准则、风险 |
+| [测试设计](./backend/docs/测试设计文档.md) | 用例设计方法论与关键行为锁定 |
+| [测试点拆解大纲](./backend/docs/测试点拆解-XMind大纲.md) | 服务→模块→测试点→方法标签（可导入 XMind） |
+| [运行测试](./backend/docs/运行测试.md) | 测试环境配置与运行 |
+| [手工测试用例-正式版](./backend/docs/手工测试用例-正式版.md) | 56 条编号用例（P0 冒烟 / P1 核心 / 探索 / 兼容） |
+| [手动测试用例清单](./backend/docs/手动测试用例清单.md) | 29 项快速执行清单（冒烟/探索/视觉） |
+| [缺陷台账](./backend/docs/缺陷台账.md) | 15 条产品缺陷单与定级标准 |
+| [测试总结报告](./backend/docs/测试总结报告.md) | 执行统计、缺陷分析、出口判定、遗留风险 |
+| [E2E 冒烟测试](./e2e/README.md) | Playwright 端到端测试 |
+| [性能基线](./backend/perf/BASELINE.md) | Locust 基线与瓶颈定位实验 |
+
+### 运维与开发
+
+| 文档 | 说明 |
+|------|------|
+| [数据库本地部署](./backend/docs/数据库本地部署.md) | PostgreSQL 本地安装配置 |
+| [故障排查指南](./backend/docs/故障排查指南.md) | 常见问题解决方案 |
+| [项目展示讲解](./backend/docs/项目展示讲解内容.md) | 答辩/演示用内容 |
+
+### 子项目文档
+
+| 文档 | 说明 |
+|------|------|
+| [后端 README](./backend/README.md) | 后端开发指南 |
+| [前端 README](./frontend/README.md) | 前端开发指南 |
+| [E2E README](./e2e/README.md) | 端到端测试说明 |
+| [文档中心](./backend/docs/README.md) | 后端文档完整索引 |
+
+---
+
+## 项目性质与分工
+
+本项目为 4 人小组课程设计的**统一归档仓库**：提交历史为交付整理后的归集记录（单作者），不代表实际分工；业务代码由小组成员共同开发。
+
+测试体系（测试计划、用例设计与拆解、56 条手工用例、315 条 pytest + 10 条 Vitest + 6 条 Playwright 自动化套件、覆盖率门禁、CI 合并门禁、Locust 性能基线、缺陷台账与测试报告）由小组**测试负责人**独立负责，入口见[测试计划](./backend/docs/测试计划.md)与[文档索引](./backend/docs/README.md)。
+
+---
+
+## 许可证
+
+MIT 许可证。详见 [LICENSE](LICENSE)。
+
+## 联系方式
+
+**作者**: cherloner
+
+[![GitHub](https://img.shields.io/badge/GitHub-cherloner-181717?logo=github)](https://github.com/cherloner)
+[![Email](https://img.shields.io/badge/Email-1844390881@qq.com-D14836?logo=gmail)](mailto:1844390881@qq.com)

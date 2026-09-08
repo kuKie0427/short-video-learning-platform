@@ -16,7 +16,8 @@ export default defineConfig({
   fullyParallel: false,
   // 串行执行：vite dev server 冷启动编译 1500+ 模块时，
   // 多 worker 并行首次访问会互相竞争编译导致超时（见 e2e/README.md）。
-  // 冒烟套件仅 5 条用例，串行 <15s，换取确定性。
+  // 冒烟套件 6 条用例（5 个 spec 文件，`npx playwright test --list` 可核），串行 <20s，换取确定性。
+  // 留痕跑法另见 playwright.smoke-evidence.config.ts（逐例截图 + trace，发布冒烟归档用）。
   workers: 1,
   retries: 0,
   reporter: [['list']],

@@ -91,3 +91,6 @@ backend/smart_split_output/
 e2e/node_modules/
 e2e/test-results/
 e2e/playwright-report/
+
+# 手工冒烟留痕的原始产物（截图/trace/video 体积大且可重跑，只归档重命名后的 png 与文本证据）
+backend/docs/manual-evidence/raw/
