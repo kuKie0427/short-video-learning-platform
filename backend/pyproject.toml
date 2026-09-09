@@ -1,0 +1,43 @@
+[project]
+name = "backend"
+version = "0.1.0"
+description = "短视频学习平台后端：7 个 FastAPI 微服务 + common 共享层"
+readme = "README.md"
+requires-python = ">=3.11"
+
+# 依赖与 requirements.txt 严格一一对应：requirements.txt 是唯一权威源
+# （CI 用 pip install -r requirements.txt，缓存键也指向该文件；
+#  .venv 现状由 uv pip install -r requirements.txt 建立）。
+# 改依赖时两边一起改，否则会出现"uv 装出来能跑、CI 装出来跑不了"的分叉。
+dependencies = [
+    # 核心依赖
+    "fastapi==0.104.1",
+    "uvicorn[standard]==0.24.0",
+    "sqlalchemy>=2.0.35",          # Python 3.13 需要 2.0.35+
+    "psycopg[binary]>=3.1.0",      # psycopg 3.x 替代 psycopg2-binary
+    "pydantic>=2.6.0",             # Python 3.13 需要 2.6+
+    "pydantic-settings>=2.1.0",
+    "python-jose[cryptography]==3.3.0",
+    "redis==5.0.1",
+    "python-multipart==0.0.6",
+    "kafka-python==2.0.2",
+    "celery==5.2.7",               # split 服务异步任务
+    # 测试依赖
+    "pytest==7.4.3",
+    "pytest-asyncio==0.21.1",
+    "pytest-cov==4.1.0",
+    "httpx>=0.25.0,<0.26.0",       # 与 FastAPI 0.104.1 / starlette 0.27.0 兼容
+    "faker==20.1.0",
+    "freezegun==1.2.2",
+    # 数据库迁移
+    "alembic==1.12.1",
+]
+
+# 可选：AI 重型依赖（split 服务的智能切分管线用，见 services/split/requirements.txt）
+# 默认不装——CI 与本地回归都靠"不装 AI 依赖"来验证等长切分降级路径
+# （BUG-001/002/003 与 test_glm_fallback.py 锁定的行为）。
+# 需要跑通智能模式时：uv pip install -r services/split/requirements.txt
+[project.optional-dependencies]
+ai = [
+    "opencv-python-headless>=5.0.0.93",
+]
