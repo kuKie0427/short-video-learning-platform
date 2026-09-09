@@ -11,6 +11,7 @@
 依赖素材：仓库内 short_video/3分钟学习微积分.mp4；开发态鉴权用固定 UUID 直通
 （common/utils/auth.py 的 DEV 分支），可用环境变量 SMOKE_DEV_USER 覆盖。
 """
+
 from __future__ import annotations
 
 import json
@@ -54,9 +55,24 @@ def query_video_row(video_id: str) -> str:
     )
     try:
         proc = subprocess.run(
-            ["docker", "exec", "-i", PG_CONTAINER, "psql", "-U", PG_USER, "-d", PG_DB,
-             "-t", "-A"],
-            input=script, capture_output=True, text=True, timeout=60, check=False,
+            [
+                "docker",
+                "exec",
+                "-i",
+                PG_CONTAINER,
+                "psql",
+                "-U",
+                PG_USER,
+                "-d",
+                PG_DB,
+                "-t",
+                "-A",
+            ],
+            input=script,
+            capture_output=True,
+            text=True,
+            timeout=60,
+            check=False,
         )
     except (OSError, subprocess.SubprocessError) as exc:
         raise SystemExit(f"FAIL 查库执行异常: {exc}") from exc
@@ -69,37 +85,64 @@ def main() -> int:
     if not SRC.is_file():
         raise SystemExit(f"FAIL 缺少冒烟素材: {SRC}")
     payload = SRC.read_bytes()
-    parts = [payload[i:i + CHUNK_SIZE] for i in range(0, len(payload), CHUNK_SIZE)]
+    parts = [payload[i : i + CHUNK_SIZE] for i in range(0, len(payload), CHUNK_SIZE)]
     print(f"素材 {SRC.name}  {len(payload)} bytes  分片数 {len(parts)}")
 
     # ① init —— 契约：响应声明 chunk_size=5242880（客户端按此分片）
-    init = httpx.post(f"{GW}/api/upload/init", headers=AUTH, json={
-        "file_name": "手工用例U01.mp4", "file_size": len(payload), "duration": 180,
-        "mime_type": "video/mp4", "video_type": "short",
-    }, timeout=60)
+    init = httpx.post(
+        f"{GW}/api/upload/init",
+        headers=AUTH,
+        json={
+            "file_name": "手工用例U01.mp4",
+            "file_size": len(payload),
+            "duration": 180,
+            "mime_type": "video/mp4",
+            "video_type": "short",
+        },
+        timeout=60,
+    )
     check(init.status_code == 200, "init 返回 200", f"(实际 {init.status_code})")
     init_data = init.json().get("data") or {}
     upload_id = init_data.get("upload_id", "")
-    check(bool(upload_id), "init 响应含 upload_id", f"(data={json.dumps(init_data, ensure_ascii=False)})")
-    check(init_data.get("chunk_size") == 5242880, "chunk_size 契约 = 5242880",
-          f"(实际 {init_data.get('chunk_size')})")
+    check(
+        bool(upload_id),
+        "init 响应含 upload_id",
+        f"(data={json.dumps(init_data, ensure_ascii=False)})",
+    )
+    check(
+        init_data.get("chunk_size") == 5242880,
+        "chunk_size 契约 = 5242880",
+        f"(实际 {init_data.get('chunk_size')})",
+    )
 
     # ② 逐片 PUT —— 契约：upload_id / chunk_index 走请求头，body 为二进制
     for idx, part in enumerate(parts):
         chunk_resp = httpx.put(
             f"{GW}/api/upload/chunk",
             headers={**AUTH, "upload_id": upload_id, "chunk_index": str(idx)},
-            content=part, timeout=120,
+            content=part,
+            timeout=120,
         )
-        check(chunk_resp.status_code == 200, f"chunk[{idx}] {len(part)}B 上传成功",
-              f"(实际 {chunk_resp.status_code} {chunk_resp.text[:120]})")
+        check(
+            chunk_resp.status_code == 200,
+            f"chunk[{idx}] {len(part)}B 上传成功",
+            f"(实际 {chunk_resp.status_code} {chunk_resp.text[:120]})",
+        )
 
     # ③ complete
-    done = httpx.post(f"{GW}/api/upload/complete", headers=AUTH, json={
-        "upload_id": upload_id, "title": "手工用例U01-冒烟留痕",
-        "description": "U01/U02 发布冒烟执行记录", "tags": ["手工冒烟"],
-        "language": "zh-CN", "is_public": True,
-    }, timeout=120)
+    done = httpx.post(
+        f"{GW}/api/upload/complete",
+        headers=AUTH,
+        json={
+            "upload_id": upload_id,
+            "title": "手工用例U01-冒烟留痕",
+            "description": "U01/U02 发布冒烟执行记录",
+            "tags": ["手工冒烟"],
+            "language": "zh-CN",
+            "is_public": True,
+        },
+        timeout=120,
+    )
     check(done.status_code == 200, "complete 返回 200", f"(实际 {done.status_code})")
     body = done.json()
     check(body.get("code") == 200, "业务信封 code=200", f"(实际 {body.get('code')})")
@@ -108,8 +151,11 @@ def main() -> int:
     data = body.get("data")
     check(bool(data), "响应体 data 非空（BUG-004 静默失败防线）")
     for field in ("video_id", "status", "file_url"):
-        check(bool((data or {}).get(field)), f"响应含业务字段 {field}",
-              f"(data={json.dumps(data, ensure_ascii=False)})")
+        check(
+            bool((data or {}).get(field)),
+            f"响应含业务字段 {field}",
+            f"(data={json.dumps(data, ensure_ascii=False)})",
+        )
 
     row = query_video_row(str((data or {}).get("video_id")))
     check(bool(row), "videos 表存在该记录（落库一致）", f"(查询结果={row!r})")
