@@ -5,7 +5,7 @@ import os
 import logging
 from typing import Optional
 from sqlalchemy import create_engine, text
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import Session, sessionmaker
 import redis
 from redis import Redis
 
@@ -102,38 +102,49 @@ def get_redis() -> Redis:
 
 
 def init_db():
-    """初始化数据库，创建所有表"""
+    """初始化数据库：创建所有表并写入演示用户（多服务并发启动安全）"""
+    # 咨询锁标识：跨服务约定的固定 bigint
+    _INIT_DB_LOCK_ID = 727272
     try:
-        # 创建所有表
-        Base.metadata.create_all(bind=engine)
-        logging.info("Database tables created successfully")
-        
-        # 创建演示用户
-        from ..models.user import User
-        db = SessionLocal()
-        try:
-            # 检查demo_user是否已存在（使用固定的UUID）
-            demo_user_id = "00000000-0000-0000-0000-000000000001"
-            demo_user = db.query(User).filter(User.id == demo_user_id).first()
-            if not demo_user:
-                # 创建演示用户
-                demo_user = User(
-                    id=demo_user_id,
-                    phone="13800138000",
-                    nickname="演示用户",
-                    avatar_url="",
-                    bio="用于前端演示的用户",
-                    roles=["admin"]
-                )
-                db.add(demo_user)
-                db.commit()
-                logging.info("Demo user created successfully")
-        except Exception as e:
-            logging.error(f"Failed to create demo user: {e}")
-            db.rollback()
-        finally:
-            db.close()
-            
+        with engine.connect() as conn:
+            # 咨询锁：串行化多服务并发建表（后到者拿锁后 checkfirst 直接跳过），
+            # 避免并发 CREATE TABLE 撞 pg_type 唯一索引
+            conn.execute(text("SELECT pg_advisory_lock(:lock_id)"), {"lock_id": _INIT_DB_LOCK_ID})
+            try:
+                Base.metadata.create_all(bind=conn)
+                conn.commit()
+                logging.info("Database tables created successfully")
+
+                # 演示用户写入须在锁内以保证幂等
+                try:
+                    from ..models.user import User
+                    with Session(bind=conn) as db:
+                        # 检查demo_user是否已存在（使用固定的UUID）
+                        demo_user_id = "00000000-0000-0000-0000-000000000001"
+                        demo_user = db.query(User).filter(User.id == demo_user_id).first()
+                        if not demo_user:
+                            # 创建演示用户
+                            demo_user = User(
+                                id=demo_user_id,
+                                phone="13800138000",
+                                nickname="演示用户",
+                                avatar_url="",
+                                bio="用于前端演示的用户",
+                                roles=["admin"]
+                            )
+                            db.add(demo_user)
+                            db.commit()
+                            logging.info("Demo user created successfully")
+                except Exception as e:
+                    logging.error(f"Failed to create demo user: {e}")
+                    conn.rollback()
+            finally:
+                try:
+                    conn.rollback()  # 清理可能的事务状态（成功路径下为空操作）
+                    conn.execute(text("SELECT pg_advisory_unlock(:lock_id)"), {"lock_id": _INIT_DB_LOCK_ID})
+                    conn.commit()
+                except Exception:
+                    logging.warning("Failed to release init_db advisory lock", exc_info=True)
     except Exception as e:
         logging.error(f"Failed to initialize database: {e}")
         raise
