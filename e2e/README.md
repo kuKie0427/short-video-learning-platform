@@ -5,7 +5,7 @@
 ## 覆盖用例（5 个文件 6 条用例）
 
 | 文件 | 用例 | 验证内容 |
-|------|------|---------|
+| ------ | ------ | --------- |
 | `login.spec.ts` | 登录流程 | 手机号+验证码 → 跳转首页；非法手机号被拦截 |
 | `login.spec.ts` | 登录页校验 | 非法手机号（10 位）被拦截，不进入验证码阶段 |
 | `home.spec.ts` | 首页推荐流 | 视频流卡片渲染（走真实 feed/recommend 接口） |
@@ -69,7 +69,7 @@ npm run evidence      # 发布冒烟留痕：逐例截图 + trace 落 backend/do
 ## 复跑记录
 
 | 日期 | 环境 | 结果 |
-|---|---|---|
+| --- | --- | --- |
 | 2026-09-04 | Docker 全栈 + 本机 vite dev | 首跑 upload/split 超时/400 → 补 `UPLOAD_BASE_DIR` 后 6/6（15.1s） |
 | 2026-09-09 | Docker 全栈 + 本机 vite dev | 首跑 5/6：split 因 `/api/split/*` 502 失败 → 定界为网关上游 IP 陈旧（BUG-016）→ `nginx -s reload` 后 6/6（19.6s）；留痕截图与 trace 已归档 `backend/docs/manual-evidence/` |
 

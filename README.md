@@ -47,7 +47,7 @@ SenseVoiceSmall ASR 语音转文字（中日韩英多语种）+ OpenCV 关键帧
 ### 服务组成
 
 | 组件 | 端口 | 说明 |
-|------|------|------|
+| ------ | ------ | ------ |
 | Nginx 网关 | :80 | 统一入口，路由转发，静态文件直出 |
 | Auth 服务 | :8001 | 认证授权、用户管理 |
 | Content 服务 | :8002 | Feed 推荐、视频信息、互动、学习记录 |
@@ -103,7 +103,7 @@ SenseVoiceSmall ASR 语音转文字（中日韩英多语种）+ OpenCV 关键帧
 ### 存储与基础设施
 
 | 基础设施 | 选型 | 说明 |
-|----------|------|------|
+| ---------- | ------ | ------ |
 | 数据库 | PostgreSQL 14 | 14 张核心表，单库共享，Alembic 迁移 |
 | 缓存 / 消息 | Redis 7 | Celery broker、会话、验证码、计数器 |
 | 文件存储 | 本地 data/uploads | nginx 静态直出；S3 为可选切换 |
@@ -114,7 +114,7 @@ SenseVoiceSmall ASR 语音转文字（中日韩英多语种）+ OpenCV 关键帧
 ### 技术栈
 
 | 层次 | 技术 |
-|------|------|
+| ------ | ------ |
 | 后端框架 | FastAPI 0.104.1（`requirements.txt` 锁定版本），Python 3.11+ |
 | ORM | SQLAlchemy 2.0+，Alembic |
 | AI 模型 | SenseVoiceSmall（ASR）、GLM 多模态（知识点分析）、OpenCV（关键帧） |
@@ -169,7 +169,7 @@ curl http://localhost/api/feed/hot?page=1      # 经网关验业务链路（只�
 ## 测试体系
 
 | 类别 | 用例数 | 工具 | 说明 |
-|------|--------|------|------|
+| ------ | -------- | ------ | ------ |
 | 后端接口集成测试 | 164（17 文件） | pytest | 真实 PostgreSQL；含幂等、安全专项 |
 | 后端单元测试 | 151（15 文件） | pytest | 推荐算法、AI 降级、工具函数 |
 | └ 其中参数化展开 | 42（13 个 parametrize 块） | pytest `@parametrize` | 认证边界 / 输入校验 / 工厂分支矩阵 |
@@ -188,7 +188,7 @@ curl http://localhost/api/feed/hot?page=1      # 经网关验业务链路（只�
 ### 快速开始
 
 | 文档 | 说明 |
-|------|------|
+| ------ | ------ |
 | [快速启动指南](./backend/QUICK_START.md) | Docker Compose 一键启动 |
 | [后端启动指南](./backend/docs/启动指南.md) | 本地开发环境配置 |
 | [项目结构](./backend/PROJECT_STRUCTURE.md) | 目录结构与文件说明 |
@@ -196,7 +196,7 @@ curl http://localhost/api/feed/hot?page=1      # 经网关验业务链路（只�
 ### 设计文档
 
 | 文档 | 说明 |
-|------|------|
+| ------ | ------ |
 | [系统架构设计](./backend/docs/系统架构设计文档.md) | 微服务架构、技术选型、服务拓扑 |
 | [数据库设计](./backend/docs/数据库设计文档.md) | 14 张表结构、关系、索引 |
 | [API 设计](./backend/docs/API设计文档.md) | 56 个接口详细文档 |
@@ -204,7 +204,7 @@ curl http://localhost/api/feed/hot?page=1      # 经网关验业务链路（只�
 ### 测试文档
 
 | 文档 | 说明 |
-|------|------|
+| ------ | ------ |
 | [测试计划](./backend/docs/测试计划.md) | 范围与不测项、分层、进入/出口准则、风险 |
 | [测试设计](./backend/docs/测试设计文档.md) | 用例设计方法论与关键行为锁定 |
 | [测试点拆解大纲](./backend/docs/测试点拆解-XMind大纲.md) | 服务→模块→测试点→方法标签（可导入 XMind） |
@@ -219,7 +219,7 @@ curl http://localhost/api/feed/hot?page=1      # 经网关验业务链路（只�
 ### 运维与开发
 
 | 文档 | 说明 |
-|------|------|
+| ------ | ------ |
 | [数据库本地部署](./backend/docs/数据库本地部署.md) | PostgreSQL 本地安装配置 |
 | [故障排查指南](./backend/docs/故障排查指南.md) | 常见问题解决方案 |
 | [项目展示讲解](./backend/docs/项目展示讲解内容.md) | 答辩/演示用内容 |
@@ -227,7 +227,7 @@ curl http://localhost/api/feed/hot?page=1      # 经网关验业务链路（只�
 ### 子项目文档
 
 | 文档 | 说明 |
-|------|------|
+| ------ | ------ |
 | [后端 README](./backend/README.md) | 后端开发指南 |
 | [前端 README](./frontend/README.md) | 前端开发指南 |
 | [E2E README](./e2e/README.md) | 端到端测试说明 |
