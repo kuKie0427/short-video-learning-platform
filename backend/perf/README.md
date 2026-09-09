@@ -45,6 +45,15 @@ locust -f perf/locustfile.py --host http://127.0.0.1:8001
 # 浏览器打开 http://localhost:8089
 ```
 
+### 网关整链路（Docker 全栈运行时）
+
+```bash
+# 前提：docker-compose up -d 全栈运行（7 服务 + 网关 + PG/Redis），打网关 80 端口
+locust -f perf/locustfile_gateway.py --headless -u 20 -r 5 -t 30s --host http://127.0.0.1
+```
+
+结果与本机直连基线**不可直接对比**，历史数据见 [BASELINE.md](./BASELINE.md) 网关专节。
+
 ## 2026-08-05 实测基线（本机 M 系列芯片, 单进程 uvicorn）
 
 **命令**: `locust -f perf/locustfile.py --headless -u 20 -r 5 -t 30s --host http://127.0.0.1:8001`
@@ -70,7 +79,8 @@ Aggregated                                       462  0(0%) |   15   14    36   
 - **P95 / P99 响应时间**：长尾体验（目标 < 500ms）
 - **失败率**：必须为 0；出现失败优先查数据库连接池、Redis 降级日志
 - 注意：本机开发环境为单进程 uvicorn + SQLite/本地 PG，数值只用于**相对回归**；
-  生产对比需在 Docker Compose 全量部署下重新采集。
+  生产形态（Docker Compose 全栈 + 网关）基线已于 2026-09-05 采集，见上方网关小节与
+  [BASELINE.md](./BASELINE.md) 网关专节，两层数据不可直接对比。
 
 ## 说明
 
