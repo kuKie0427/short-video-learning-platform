@@ -1,78 +1,60 @@
-# 快速启动指南
+# 快速启动
 
-## 🚀 一键启动（Docker Compose）
+Docker Compose 一键启动全部服务（7 个微服务 + API 网关 + PostgreSQL/Redis/Kafka）。
+
+完整开发环境说明见[启动指南](docs/启动指南.md)，数据库专项见[数据库本地部署](docs/数据库本地部署.md)。
+
+## 前置条件
+
+- Docker 与 Docker Compose
+
+## 一键启动
 
 ```bash
-# 1. 进入backend目录
+# 1. 进入 backend 目录
 cd backend
 
-# 2. 清理旧容器（如果有）
+# 2. 容器名冲突时清理，正常可跳过
 ./scripts/cleanup_docker.sh
 
-# 3. 启动所有服务
+# 3. 启动所有服务（首次构建镜像耗时较长）
 docker-compose up -d
 
-# 4. 等待服务启动（约30秒）
-sleep 30
+# 4. 查看状态，全部服务应为 Up
+docker-compose ps
+```
 
-# 5. 运行诊断检查
+## 验证启动
+
+```bash
+# 一键诊断：容器状态、基础设施、各服务健康检查
 ./scripts/diagnose.sh
 
-# 6. 验证服务
-curl http://localhost:8001/health
-curl http://localhost:8002/health
+# 健康检查
+curl http://localhost:8001/health    # Auth
+curl http://localhost:8002/health    # Content
+curl http://localhost/health         # 网关，返回 healthy
 
-# 7. 访问API文档
-open http://localhost:8001/docs
+# 访问 API 文档
+open http://localhost:8001/docs     # Auth 服务
+open http://localhost:8002/docs     # Content 服务
 ```
 
-## ✅ 验证成功标志
+健康检查返回形如 `{"status":"healthy","service":"auth","timestamp":"...","version":"1.0.0"}`。
 
-启动成功后，应该看到：
+## 失败时
 
-1. ✅ 所有服务状态为 "Up"
-   ```bash
-   docker-compose ps
-   ```
-
-2. ✅ 健康检查返回正常
-   ```bash
-   curl http://localhost:8001/health
-   # 返回: {"status":"healthy","service":"auth",...}
-   ```
-
-3. ✅ API文档可访问
-   - http://localhost:8001/docs (Auth服务)
-   - http://localhost:8002/docs (Content服务)
-
-## ❌ 如果验证失败
-
-### 快速诊断
 ```bash
-./scripts/diagnose.sh
+./scripts/diagnose.sh                 # 定位问题
+docker-compose logs --tail=50         # 最近日志
+docker-compose logs -f auth-service   # 跟踪单个服务
 ```
 
-### 查看日志
-```bash
-# 查看所有服务日志
-docker-compose logs --tail=50
+详细排查步骤见[故障排查指南](docs/故障排查指南.md)。
 
-# 查看特定服务日志
-docker-compose logs -f auth-service
-```
+## 相关文档
 
-### 常见问题
-
-1. **容器未启动**：查看日志找出原因
-2. **数据库连接失败**：确保PostgreSQL容器运行
-3. **端口被占用**：检查端口占用情况
-4. **代码错误**：查看服务日志中的错误信息
-
-**详细排查**：查看 [docs/故障排查指南.md](./docs/故障排查指南.md)
-
-## 📚 更多信息
-
-- [完整启动指南](./docs/启动指南.md)
-- [故障排查指南](./docs/故障排查指南.md)
-- [项目结构说明](./PROJECT_STRUCTURE.md)
-
+- [完整启动指南](docs/启动指南.md)：Docker 与本地开发两种方式、环境变量、数据存储
+- [数据库本地部署](docs/数据库本地部署.md)：连接信息、表结构、备份恢复
+- [故障排查指南](docs/故障排查指南.md)：常见问题与处理
+- [项目结构说明](PROJECT_STRUCTURE.md)
