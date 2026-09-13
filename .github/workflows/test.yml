@@ -39,22 +39,19 @@ jobs:
           cache: 'pip'
           cache-dependency-path: backend/requirements.txt
 
-      - name: Install dependencies
+      - name: 依赖安装
         run: pip install -r requirements.txt
 
-      # video_split 用例(9 条)构造 RealVideoSplitService 时校验 ffmpeg,
-      # ubuntu runner 镜像不再预装,需显式安装
-      - name: Install ffmpeg
+      - name: 安装 ffmpeg
         run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg
 
-      - name: Run full test suite (315 cases, PostgreSQL integration)
+      - name: 运行全量后端单元测试（pytest + coverage）
         run: pytest tests/ -q
 
-      # 覆盖率分级门禁：核心业务模块独立底线（防被总量掩盖）
-      - name: Check per-module coverage gates
+      - name: 检查覆盖率门禁
         run: python scripts/check_coverage_gates.py
 
-      - name: Upload coverage report
+      - name: 加载 coverage 报告到 GitHub Actions
         uses: actions/upload-artifact@v4
         with:
           name: coverage-report
@@ -76,10 +73,10 @@ jobs:
           cache: 'npm'
           cache-dependency-path: frontend/package-lock.json
 
-      - name: Install dependencies
+      - name: 依赖安装
         run: npm ci
 
-      - name: Run frontend unit tests (Vitest)
+      - name: 运行前端单元测试（Jest + React Testing Library）
         run: npm test
 
       - name: Lint (ESLint)
@@ -136,7 +133,7 @@ jobs:
           cache: 'pip'
           cache-dependency-path: backend/requirements.txt
 
-      - name: Install backend dependencies
+      - name: 依赖安装
         run: pip install -r requirements.txt
         working-directory: backend
 
@@ -172,17 +169,12 @@ jobs:
           nohup python -m uvicorn services.split.app.main:app --host 127.0.0.1 --port 8004 > /tmp/svc-split.log 2>&1 &
           nohup python -m uvicorn services.search.app.main:app --host 127.0.0.1 --port 8006 > /tmp/svc-search.log 2>&1 &
 
-      - name: Seed mock videos into database
+      - name: 插入 mock 视频数据
         working-directory: backend
         run: python scripts/insert_mock_videos.py
 
-      - name: Start Nginx gateway
+      - name: 启动 nginx 网关
         run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq nginx > /dev/null
-          # 停掉 apt 自动启动的默认 nginx，改用 CI 网关配置
-          sudo systemctl stop nginx || true
-          sudo pkill nginx || true
           sudo mkdir -p /tmp/data/uploads /tmp/smart_split_output /tmp/nginx_body_temp
           sudo chmod -R 777 /tmp/data /tmp/smart_split_output /tmp/nginx_body_temp
           sudo nginx -c $GITHUB_WORKSPACE/backend/gateway/nginx-ci.conf
@@ -197,28 +189,28 @@ jobs:
           # 网关 → content → DB 链路就绪（最多等 60s）
           for i in $(seq 1 30); do
             if curl -sf http://localhost/api/feed/recommend > /dev/null; then
-              echo "✅ gateway + content + DB ready"
+              echo "gateway + content + DB ready"
               break
             fi
             if [ "$i" = "30" ]; then
-              echo "❌ gateway not ready after 60s"
+              echo "gateway not ready after 60s"
               cat /tmp/svc-auth.log /tmp/svc-content.log /tmp/svc-upload.log /tmp/svc-search.log 2>/dev/null
               exit 1
             fi
             sleep 2
           done
-          curl -sf http://localhost:3000 > /dev/null && echo "✅ frontend ready"
+          curl -sf http://localhost:3000 > /dev/null && echo "frontend ready"
           # 预热 vite 冷编译（首次访问需编译 1500+ 模块，避免测试与编译竞争）
           for route in /login / /search /upload; do
             curl -sf -o /dev/null "http://localhost:3000$route" || true
           done
-          echo "✅ frontend routes warmed up"
+          echo "frontend routes warmed up"
 
       - name: Run Playwright E2E suite
         working-directory: e2e
         run: npx playwright test
 
-      - name: Upload E2E traces/screenshots on failure
+      - name: 加载 E2E 测试报告到 GitHub Actions
         if: failure()
         uses: actions/upload-artifact@v4
         with:
